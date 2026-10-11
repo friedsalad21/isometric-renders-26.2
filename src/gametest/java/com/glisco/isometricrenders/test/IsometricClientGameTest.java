@@ -45,6 +45,27 @@ public class IsometricClientGameTest implements FabricClientGameTest {
             shot(context, "entity_zombie", () -> EntityRenderable.of(BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.withDefaultNamespace("zombie")), null));
             shot(context, "tooltip_sword", () -> new TooltipRenderable(new ItemStack(Items.DIAMOND_SWORD)));
             shot(context, "area", () -> AreaRenderable.of(origin, origin.offset(4, 3, 4)));
+            // Layers of stacked translucent blocks to check sorting
+            final var glass = origin.offset(0, 0, 8);
+            server.runCommand("fill " + glass.getX() + " " + glass.getY() + " " + glass.getZ() + " " + (glass.getX() + 6) + " " + (glass.getY() + 3) + " " + (glass.getZ() + 3) + " minecraft:air");
+            server.runCommand("fill " + glass.getX() + " " + glass.getY() + " " + glass.getZ() + " " + (glass.getX() + 6) + " " + glass.getY() + " " + (glass.getZ() + 3) + " minecraft:stone_bricks");
+            server.runCommand("fill " + glass.getX() + " " + (glass.getY() + 1) + " " + glass.getZ() + " " + (glass.getX() + 6) + " " + (glass.getY() + 1) + " " + glass.getZ() + " minecraft:light_blue_stained_glass");
+            server.runCommand("fill " + glass.getX() + " " + (glass.getY() + 1) + " " + (glass.getZ() + 2) + " " + (glass.getX() + 6) + " " + (glass.getY() + 2) + " " + (glass.getZ() + 2) + " minecraft:orange_stained_glass");
+            server.runCommand("fill " + glass.getX() + " " + (glass.getY() + 1) + " " + (glass.getZ() + 3) + " " + (glass.getX() + 6) + " " + (glass.getY() + 1) + " " + (glass.getZ() + 3) + " minecraft:redstone_block");
+            server.runCommand("fill " + (glass.getX() + 2) + " " + (glass.getY() + 1) + " " + (glass.getZ() + 1) + " " + (glass.getX() + 4) + " " + (glass.getY() + 1) + " " + (glass.getZ() + 1) + " minecraft:water");
+            context.waitTicks(10);
+
+            final var glassExport = new AtomicReference<File>();
+            context.setScreen(() -> {
+                var screen = new RenderScreen(AreaRenderable.of(glass, glass.offset(6, 3, 3)));
+                screen.setExportCallback(glassExport::set);
+                return screen;
+            });
+            context.waitTicks(40);
+            context.runOnClient(client -> ((RenderScreen) client.gui.screen()).scheduleCapture());
+            context.waitFor(client -> glassExport.get() != null, 200);
+            System.out.println("[isometric-gametest] exported " + glassExport.get().getAbsolutePath());
+
             shot(context, "atlas", () -> new ItemAtlasRenderable("test", java.util.List.of(new ItemStack(Items.APPLE), new ItemStack(Items.STONE), new ItemStack(Items.BOW), new ItemStack(Items.CHEST), new ItemStack(Items.SHIELD))));
 
             context.setScreen(() -> null);

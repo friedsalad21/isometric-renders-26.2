@@ -6,6 +6,8 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.MeshData;
+import org.joml.Vector3f;
 import com.mojang.blaze3d.IndexType;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import io.wispforest.worldmesher.render.FluidVertexConsumer;
@@ -70,6 +72,12 @@ public class WorldMesh {
     // Vertex storage
     private final Map<ChunkSectionLayer, UploadedLayer> bufferStorage = new EnumMap<>(ChunkSectionLayer.class);
 
+    // Translucent quads are re-sorted whenever the view direction changes,
+    // the render's camera has nothing to do with the player's
+    private @Nullable MeshData.SortState translucentSort;
+    private @Nullable ByteBufferBuilder sortBuffer;
+    private final Vector3f lastSortDirection = new Vector3f();
+
     private record UploadedLayer(GpuBuffer vertices, @Nullable GpuBuffer indices, IndexType indexType, int indexCount) {
         void close() {
             this.vertices.close();
@@ -113,6 +121,7 @@ public class WorldMesh {
 
         // Enum order puts translucent last
         this.bufferStorage.forEach((layer, uploaded) -> {
+            if (layer.translucent()) this.resortIfNeeded(modelView, uploaded);
             renderStartAction.run();
 
             final var indices = uploaded.indices != null
@@ -127,12 +136,35 @@ public class WorldMesh {
         modelView.popMatrix();
     }
 
+    private void resortIfNeeded(Matrix4f modelView, UploadedLayer uploaded) {
+        if (this.translucentSort == null || this.sortBuffer == null || uploaded.indices == null) return;
+
+        // Orthographic view: sort by distance to a point far behind the viewer, in mesh space
+        var direction = new Matrix4f(modelView).invert().transformDirection(new Vector3f(0, 0, 1)).normalize();
+        if (direction.dot(this.lastSortDirection) > 0.99999f) return;
+        this.lastSortDirection.set(direction);
+
+        var center = new Vector3f((float) this.dimensions.getXsize(), (float) this.dimensions.getYsize(), (float) this.dimensions.getZsize()).mul(.5f);
+        var eye = center.add(direction.mul(1000));
+
+        try (var sorted = this.translucentSort.buildSortedIndexBuffer(this.sortBuffer, VertexSorting.byDistance(eye.x, eye.y, eye.z))) {
+            if (sorted == null) return;
+            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(uploaded.indices.slice(), sorted.byteBuffer());
+        }
+    }
+
     private static RenderType renderTypeFor(ChunkSectionLayer layer) {
         return switch (layer) {
             case SOLID -> RenderTypes.solidMovingBlock();
             case CUTOUT -> RenderTypes.cutoutMovingBlock();
             case TRANSLUCENT -> RenderTypes.translucentMovingBlock();
         };
+    }
+
+    private void releaseSortState() {
+        if (this.sortBuffer != null) this.sortBuffer.close();
+        this.sortBuffer = null;
+        this.translucentSort = null;
     }
 
     /**
@@ -229,6 +261,7 @@ public class WorldMesh {
     public void reset() {
         this.bufferStorage.values().forEach(UploadedLayer::close);
         this.bufferStorage.clear();
+        this.releaseSortState();
 
         this.state = MeshState.NEW;
     }
@@ -369,6 +402,7 @@ public class WorldMesh {
             try {
                 this.bufferStorage.values().forEach(UploadedLayer::close);
                 this.bufferStorage.clear();
+                this.releaseSortState();
 
                 var device = RenderSystem.getDevice();
                 builders.forEach((layer, builder) -> {
@@ -376,14 +410,16 @@ public class WorldMesh {
                         if (mesh == null) return;
 
                         if (layer.translucent()) {
-                            var camera = client.gameRenderer.mainCamera().position();
-                            mesh.sortQuads(allocators.get(layer), VertexSorting.byDistance((float) camera.x - from.getX(), (float) camera.y - from.getY(), (float) camera.z - from.getZ()));
+                            // Initial order doesn't matter, the first render re-sorts for its view
+                            this.translucentSort = mesh.sortQuads(allocators.get(layer), VertexSorting.byDistance(0, 0, 0));
+                            this.sortBuffer = new ByteBufferBuilder(mesh.drawState().indexCount() * 4);
+                            this.lastSortDirection.zero();
                         }
 
                         var vertices = device.createBuffer(() -> "WorldMesh " + layer.label() + " vertices", GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer());
                         var indexBuffer = mesh.indexBuffer();
                         var indices = indexBuffer != null
-                                ? device.createBuffer(() -> "WorldMesh " + layer.label() + " indices", GpuBuffer.USAGE_INDEX, indexBuffer)
+                                ? device.createBuffer(() -> "WorldMesh " + layer.label() + " indices", GpuBuffer.USAGE_INDEX | GpuBuffer.USAGE_COPY_DST, indexBuffer)
                                 : null;
 
                         var drawState = mesh.drawState();

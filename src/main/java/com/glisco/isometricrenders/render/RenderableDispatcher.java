@@ -87,6 +87,20 @@ public class RenderableDispatcher {
     }
 
     /**
+     * Translucent geometry is blended into the transparent target with
+     * premultiplied color, PNGs expect straight alpha
+     */
+    static int unpremultiply(int abgr) {
+        final int alpha = abgr >>> 24;
+        if (alpha == 0 || alpha == 255) return abgr;
+
+        final int c0 = Math.min(255, (abgr & 0xFF) * 255 / alpha);
+        final int c1 = Math.min(255, (abgr >> 8 & 0xFF) * 255 / alpha);
+        final int c2 = Math.min(255, (abgr >> 16 & 0xFF) * 255 / alpha);
+        return alpha << 24 | c2 << 16 | c1 << 8 | c0;
+    }
+
+    /**
      * Draws the given renderable into a new texture and asynchronously
      * copies the result into a {@link NativeImage}. Must be called during the render phase
      *
@@ -114,7 +128,7 @@ public class RenderableDispatcher {
                 final var image = new NativeImage(size, size, false);
                 for (int y = 0; y < size; y++) {
                     for (int x = 0; x < size; x++) {
-                        image.setPixelABGR(x, size - y - 1, read.data().getInt((x + y * size) * blockSize));
+                        image.setPixelABGR(x, size - y - 1, unpremultiply(read.data().getInt((x + y * size) * blockSize)));
                     }
                 }
                 future.complete(image);
