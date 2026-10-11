@@ -2,7 +2,7 @@ package com.glisco.isometricrenders.util;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 public interface ClientRenderCallback {
 
@@ -12,6 +12,6 @@ public interface ClientRenderCallback {
         }
     });
 
-    void onRenderStart(MinecraftClient client);
+    void onRenderStart(Minecraft client);
 
 }

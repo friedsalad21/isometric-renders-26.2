@@ -2,8 +2,6 @@ package com.glisco.isometricrenders.util;
 
 import com.glisco.isometricrenders.IsometricRenders;
 import com.glisco.isometricrenders.property.GlobalProperties;
-import net.minecraft.util.Util;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.Util;
 
 public class FFmpegDispatcher {
 
@@ -45,7 +44,7 @@ public class FFmpegDispatcher {
                 IsometricRenders.LOGGER.info("Did not detect FFmpeg for reason: {}", exception.getMessage());
                 return false;
             }
-        }, Util.getMainWorkerExecutor()).whenComplete((result, throwable) -> {
+        }, Util.backgroundExecutor()).whenComplete((result, throwable) -> {
             if (throwable != null) {
                 ffmpegDetected = false;
                 IsometricRenders.LOGGER.warn("Could not complete FFmpeg detection", throwable);

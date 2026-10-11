@@ -1,17 +1,16 @@
 package com.glisco.isometricrenders.util;
 
 import com.glisco.isometricrenders.IsometricRenders;
-import net.minecraft.util.math.Box;
-
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import net.minecraft.world.phys.AABB;
 
 public class ParticleRestriction<T> {
 
     public static final Allow<Supplier<Boolean>> ALLOW_DURING_TICK = new Allow<>();
     public static final Allow<Void> ALLOW_ALWAYS = new Allow<>();
     public static final Allow<Void> ALLOW_NEVER = new Allow<>();
-    public static final Allow<Predicate<Box>> ALLOW_IN_AREA = new Allow<>();
+    public static final Allow<Predicate<AABB>> ALLOW_IN_AREA = new Allow<>();
 
     private static final ParticleRestriction<Supplier<Boolean>> DURING_TICK = new ParticleRestriction<>(ALLOW_DURING_TICK, () -> IsometricRenders.inRenderableTick);
     private static final ParticleRestriction<Void> ALWAYS = new ParticleRestriction<>(ALLOW_ALWAYS, null);
@@ -37,7 +36,7 @@ public class ParticleRestriction<T> {
         return NEVER;
     }
 
-    public static ParticleRestriction<Predicate<Box>> inArea(Box area) {
+    public static ParticleRestriction<Predicate<AABB>> inArea(AABB area) {
         return new ParticleRestriction<>(ALLOW_IN_AREA, area::intersects);
     }
 

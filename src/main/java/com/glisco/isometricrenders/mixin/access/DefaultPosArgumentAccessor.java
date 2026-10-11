@@ -1,20 +1,20 @@
 package com.glisco.isometricrenders.mixin.access;
 
-import net.minecraft.command.argument.CoordinateArgument;
-import net.minecraft.command.argument.DefaultPosArgument;
+import net.minecraft.commands.arguments.coordinates.WorldCoordinate;
+import net.minecraft.commands.arguments.coordinates.WorldCoordinates;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(DefaultPosArgument.class)
+@Mixin(WorldCoordinates.class)
 public interface DefaultPosArgumentAccessor {
 
     @Accessor("x")
-    CoordinateArgument isometric$getX();
+    WorldCoordinate isometric$getX();
 
     @Accessor("y")
-    CoordinateArgument isometric$getY();
+    WorldCoordinate isometric$getY();
 
     @Accessor("z")
-    CoordinateArgument isometric$getZ();
+    WorldCoordinate isometric$getZ();
 
 }

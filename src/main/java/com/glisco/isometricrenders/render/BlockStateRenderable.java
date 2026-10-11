@@ -4,26 +4,26 @@ import com.glisco.isometricrenders.mixin.access.BlockEntityAccessor;
 import com.glisco.isometricrenders.property.DefaultPropertyBundle;
 import com.glisco.isometricrenders.util.ExportPathSpec;
 import com.glisco.isometricrenders.util.ParticleRestriction;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockEntityProvider;
-import net.minecraft.block.BlockRenderType;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundle> implements TickingRenderable<DefaultPropertyBundle> {
 
-    private final MinecraftClient client = MinecraftClient.getInstance();
+    private final Minecraft client = Minecraft.getInstance();
 
     private final BlockState state;
     private final @Nullable BlockEntity entity;
@@ -34,46 +34,46 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
     }
 
     public static BlockStateRenderable of(Block block) {
-        return of(block.getDefaultState(), null);
+        return of(block.defaultBlockState(), null);
     }
 
-    public static BlockStateRenderable of(BlockState state, @Nullable NbtCompound nbt) {
-        final var client = MinecraftClient.getInstance();
+    public static BlockStateRenderable of(BlockState state, @Nullable CompoundTag nbt) {
+        final var client = Minecraft.getInstance();
 
         BlockEntity blockEntity = null;
 
-        if (state.getBlock() instanceof BlockEntityProvider provider) {
-            blockEntity = provider.createBlockEntity(client.player.getBlockPos(), state);
+        if (state.getBlock() instanceof EntityBlock provider) {
+            blockEntity = provider.newBlockEntity(client.player.blockPosition(), state);
             prepareBlockEntity(state, blockEntity, nbt);
         }
 
         return new BlockStateRenderable(state, blockEntity);
     }
 
-    public static BlockStateRenderable copyOf(World world, BlockPos pos) {
+    public static BlockStateRenderable copyOf(Level world, BlockPos pos) {
         final var state = world.getBlockState(pos);
         final var data = world.getBlockEntity(pos) != null
-                ? world.getBlockEntity(pos).createNbt(world.getRegistryManager())
+                ? world.getBlockEntity(pos).saveWithoutMetadata(world.registryAccess())
                 : null;
 
         return of(state, data);
     }
 
     @Override
-    public void emitVertices(MatrixStack matrices, VertexConsumerProvider vertexConsumers, float tickDelta) {
-        matrices.push();
+    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
+        matrices.pushPose();
         matrices.translate(-0.5, -0.5, -0.5);
 
-        if (this.state.getRenderType() != BlockRenderType.INVISIBLE) {
-            this.client.getBlockRenderManager().renderBlockAsEntity(this.state, matrices, vertexConsumers, LightmapTextureManager.MAX_LIGHT_COORDINATE, OverlayTexture.DEFAULT_UV);
+        if (this.state.getRenderShape() != RenderShape.INVISIBLE) {
+            this.client.getBlockRenderer().renderSingleBlock(this.state, matrices, vertexConsumers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
         }
 
-        if (this.entity != null && this.client.getBlockEntityRenderDispatcher().get(this.entity) != null) {
-            this.client.getBlockEntityRenderDispatcher().get(this.entity).render(entity, tickDelta, matrices, vertexConsumers, LightmapTextureManager.MAX_LIGHT_COORDINATE, OverlayTexture.DEFAULT_UV);
+        if (this.entity != null && this.client.getBlockEntityRenderDispatcher().getRenderer(this.entity) != null) {
+            this.client.getBlockEntityRenderDispatcher().getRenderer(this.entity).render(entity, tickDelta, matrices, vertexConsumers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
         }
 
-        if (vertexConsumers instanceof VertexConsumerProvider.Immediate immediate) {
-            immediate.draw();
+        if (vertexConsumers instanceof MultiBufferSource.BufferSource immediate) {
+            immediate.endBatch();
         }
 
         double xOffset = this.client.player.getX() % 1d;
@@ -83,23 +83,23 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
         if (zOffset < 0) zOffset += 1;
 
         matrices.translate(xOffset, 1.65 + this.client.player.getY() % 1d, zOffset);
-        this.renderParticles(matrices.peek().getPositionMatrix(), tickDelta);
+        this.renderParticles(matrices.last().pose(), tickDelta);
 
-        matrices.pop();
+        matrices.popPose();
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public void tick() {
-        if (this.entity != null && this.state.getBlockEntityTicker(client.world, this.entity.getType()) != null) {
-            final var ticker = this.state.getBlockEntityTicker(client.world, (BlockEntityType<BlockEntity>) this.entity.getType());
+        if (this.entity != null && this.state.getTicker(client.level, this.entity.getType()) != null) {
+            final var ticker = this.state.getTicker(client.level, (BlockEntityType<BlockEntity>) this.entity.getType());
             if (ticker == null) return;
 
-            ticker.tick(client.world, client.player.getBlockPos(), this.state, this.entity);
+            ticker.tick(client.level, client.player.blockPosition(), this.state, this.entity);
         }
 
-        if (client.world.random.nextDouble() < 0.150) {
-            this.state.getBlock().randomDisplayTick(this.state, client.world, client.player.getBlockPos(), client.world.random);
+        if (client.level.random.nextDouble() < 0.150) {
+            this.state.getBlock().animateTick(this.state, client.level, client.player.blockPosition(), client.level.random);
         }
     }
 
@@ -116,16 +116,16 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
     @Override
     public ExportPathSpec exportPath() {
         return ExportPathSpec.ofIdentified(
-                Registries.BLOCK.getId(this.state.getBlock()),
+                BuiltInRegistries.BLOCK.getKey(this.state.getBlock()),
                 "block"
         );
     }
 
-    private static void prepareBlockEntity(BlockState state, BlockEntity blockEntity, @Nullable NbtCompound nbt) {
+    private static void prepareBlockEntity(BlockState state, BlockEntity blockEntity, @Nullable CompoundTag nbt) {
         if (blockEntity == null) return;
 
         ((BlockEntityAccessor) blockEntity).isometric$setCachedState(state);
-        blockEntity.setWorld(MinecraftClient.getInstance().world);
+        blockEntity.setLevel(Minecraft.getInstance().level);
 
         if (nbt == null) return;
 
@@ -135,6 +135,6 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
         nbtCopy.putInt("y", 0);
         nbtCopy.putInt("z", 0);
 
-        blockEntity.read(nbtCopy, MinecraftClient.getInstance().world.getRegistryManager());
+        blockEntity.loadWithComponents(nbtCopy, Minecraft.getInstance().level.registryAccess());
     }
 }

@@ -5,28 +5,28 @@ import com.glisco.isometricrenders.render.Renderable;
 import com.glisco.isometricrenders.screen.RenderScreen;
 import io.wispforest.exo.api.Exo;
 import io.wispforest.exo.api.ExoCommandChannel;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 
 public class IsometricChannel extends ExoCommandChannel {
 
     public IsometricChannel() {
         addCommand("open-screen", (port, arguments) -> {
-            MinecraftClient.getInstance().execute(() -> MinecraftClient.getInstance().setScreen(new RenderScreen(Renderable.EMPTY)));
+            Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(new RenderScreen(Renderable.EMPTY)));
             return Exo.OK_RESPONSE;
         });
 
         addCommand("render-item", (port, arguments) -> {
             if (arguments.length < 1) return Exo.join("error", "missing item id");
 
-            final var id = Identifier.of(arguments[0]);
-            final var client = MinecraftClient.getInstance();
+            final var id = ResourceLocation.parse(arguments[0]);
+            final var client = Minecraft.getInstance();
 
-            if (Registries.ITEM.containsId(id)) {
-                MinecraftClient.getInstance().execute(() -> {
-                    final var stack = new ItemStack(Registries.ITEM.get(id));
+            if (BuiltInRegistries.ITEM.containsKey(id)) {
+                Minecraft.getInstance().execute(() -> {
+                    final var stack = new ItemStack(BuiltInRegistries.ITEM.getValue(id));
                     final var renderable = new ItemRenderable(stack);
 
                     var screen = new RenderScreen(renderable);

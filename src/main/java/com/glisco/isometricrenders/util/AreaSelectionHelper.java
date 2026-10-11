@@ -3,13 +3,17 @@ package com.glisco.isometricrenders.util;
 import com.glisco.isometricrenders.render.AreaRenderable;
 import com.glisco.isometricrenders.screen.RenderScreen;
 import com.glisco.isometricrenders.screen.ScreenScheduler;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.ShapeRenderer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 
 public class AreaSelectionHelper {
 
@@ -26,36 +30,36 @@ public class AreaSelectionHelper {
         Translate.actionBar("selection_cleared");
     }
 
-    public static void renderSelectionBox(MatrixStack matrices, Camera camera) {
+    public static void renderSelectionBox(PoseStack matrices, Camera camera) {
         if (!AreaSelectionHelper.shouldDraw()) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        ClientPlayerEntity player = client.player;
+        Minecraft client = Minecraft.getInstance();
+        LocalPlayer player = client.player;
 
         BlockPos origin = AreaSelectionHelper.pos1;
 
-        HitResult result = player.raycast(player.getAbilities().creativeMode ? 5.0F : 4.5F, 0, false);
-        BlockPos size = AreaSelectionHelper.pos2 != null ? AreaSelectionHelper.pos2 : (result.getType() == HitResult.Type.BLOCK ? ((BlockHitResult) result).getBlockPos() : BlockPos.ofFloored(result.getPos()));
+        HitResult result = player.pick(player.getAbilities().instabuild ? 5.0F : 4.5F, 0, false);
+        BlockPos size = AreaSelectionHelper.pos2 != null ? AreaSelectionHelper.pos2 : (result.getType() == HitResult.Type.BLOCK ? ((BlockHitResult) result).getBlockPos() : BlockPos.containing(result.getLocation()));
         size = size.subtract(origin);
 
-        origin = origin.add(size.getX() < 0 ? 1 : 0, size.getY() < 0 ? 1 : 0, size.getZ() < 0 ? 1 : 0);
-        size = size.add(size.getX() >= 0 ? 1 : -1, size.getY() >= 0 ? 1 : -1, size.getZ() >= 0 ? 1 : -1);
+        origin = origin.offset(size.getX() < 0 ? 1 : 0, size.getY() < 0 ? 1 : 0, size.getZ() < 0 ? 1 : 0);
+        size = size.offset(size.getX() >= 0 ? 1 : -1, size.getY() >= 0 ? 1 : -1, size.getZ() >= 0 ? 1 : -1);
 
-        matrices.push();
+        matrices.pushPose();
 
-        VertexConsumer consumer = client.getBufferBuilders().getEntityVertexConsumers().getBuffer(RenderLayer.getLines());
-        matrices.translate(origin.getX() - camera.getPos().x, origin.getY() - camera.getPos().y, origin.getZ() - camera.getPos().z);
+        VertexConsumer consumer = client.renderBuffers().bufferSource().getBuffer(RenderType.lines());
+        matrices.translate(origin.getX() - camera.getPosition().x, origin.getY() - camera.getPosition().y, origin.getZ() - camera.getPosition().z);
 
-        VertexRendering.drawBox(matrices, consumer, 0, 0, 0, size.getX(), size.getY(), size.getZ(), 1, 1, 1, 1, 0, 0, 0);
+        ShapeRenderer.renderLineBox(matrices, consumer, 0, 0, 0, size.getX(), size.getY(), size.getZ(), 1, 1, 1, 1, 0, 0, 0);
 
-        matrices.pop();
+        matrices.popPose();
     }
 
     public static void select() {
-        final MinecraftClient client = MinecraftClient.getInstance();
-        final HitResult target = client.crosshairTarget;
+        final Minecraft client = Minecraft.getInstance();
+        final HitResult target = client.hitResult;
         if ((target == null)) return;
-        BlockPos targetPos = new BlockPos(target.getType() == HitResult.Type.BLOCK ? ((BlockHitResult) target).getBlockPos() : BlockPos.ofFloored(target.getPos()));
+        BlockPos targetPos = new BlockPos(target.getType() == HitResult.Type.BLOCK ? ((BlockHitResult) target).getBlockPos() : BlockPos.containing(target.getLocation()));
 
         if (pos1 == null) {
             pos1 = targetPos;

@@ -2,20 +2,20 @@ package com.glisco.isometricrenders.render;
 
 import com.glisco.isometricrenders.IsometricRenders;
 import com.glisco.isometricrenders.mixin.access.FramebufferAccessor;
+import com.mojang.blaze3d.ProjectionType;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.systems.ProjectionType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.gl.SimpleFramebuffer;
-import net.minecraft.client.texture.NativeImage;
-import net.minecraft.client.util.math.MatrixStack;
+import com.mojang.blaze3d.vertex.PoseStack;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector4f;
 
 import java.util.function.Consumer;
+import net.minecraft.client.Minecraft;
 
 public class RenderableDispatcher {
 
@@ -57,8 +57,8 @@ public class RenderableDispatcher {
 //        RenderSystem.runAsFancy(() -> {
             // Emit untransformed vertices
             renderable.emitVertices(
-                    new MatrixStack(),
-                    MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers(),
+                    new PoseStack(),
+                    Minecraft.getInstance().renderBuffers().bufferSource(),
                     tickDelta
             );
 
@@ -95,8 +95,8 @@ public class RenderableDispatcher {
      * @return The framebuffer object holding the pointer to the color attachment
      */
     @SuppressWarnings("ConstantConditions")
-    public static Framebuffer drawIntoTexture(Renderable<?> renderable, float tickDelta, int size) {
-        final var framebuffer = new SimpleFramebuffer(size, size, true);
+    public static RenderTarget drawIntoTexture(Renderable<?> renderable, float tickDelta, int size) {
+        final var framebuffer = new TextureTarget(size, size, true);
 
         RenderSystem.enableBlend();
         RenderSystem.clear(16640);
@@ -104,18 +104,18 @@ public class RenderableDispatcher {
         framebuffer.setClearColor(0, 0, 0, 0);
         framebuffer.clear();
 
-        framebuffer.beginWrite(true);
+        framebuffer.bindWrite(true);
         IsometricRenders.mainTargetOverride = framebuffer;
 
         drawIntoActiveFramebuffer(renderable, 1, tickDelta, matrixStack -> {});
 
-        framebuffer.endWrite();
+        framebuffer.unbindWrite();
         IsometricRenders.mainTargetOverride = null;
 
         // Release depth attachment and FBO to save on VRAM - we only need
         // the color attachment texture to later turn into an image
         final var accessor = (FramebufferAccessor) framebuffer;
-        TextureUtil.releaseTextureId(framebuffer.getDepthAttachment());
+        TextureUtil.releaseTextureId(framebuffer.getDepthTextureId());
         accessor.isometric$setDepthAttachment(-1);
 
         GlStateManager._glDeleteFramebuffers(accessor.isometric$getFbo());
@@ -131,17 +131,17 @@ public class RenderableDispatcher {
      * @param framebuffer The framebuffer to copy
      * @return The created image
      */
-    public static NativeImage copyFramebufferIntoImage(Framebuffer framebuffer) {
-        final NativeImage img = new NativeImage(framebuffer.textureWidth, framebuffer.textureHeight, false);
+    public static NativeImage copyFramebufferIntoImage(RenderTarget framebuffer) {
+        final NativeImage img = new NativeImage(framebuffer.width, framebuffer.height, false);
 
         // This call internally binds the buffer's color attachment texture
-        framebuffer.beginRead();
+        framebuffer.bindRead();
 
         // This method gets the pixels from the currently bound texture
-        img.loadFromTextureImage(0, false);
-        img.mirrorVertically();
+        img.downloadTexture(0, false);
+        img.flipY();
 
-        framebuffer.delete();
+        framebuffer.destroyBuffers();
 
         return img;
     }

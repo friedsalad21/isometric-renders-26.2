@@ -1,8 +1,5 @@
 package com.glisco.isometricrenders.util;
 
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import org.lwjgl.opengl.ATIMeminfo;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -10,6 +7,9 @@ import org.lwjgl.opengl.NVXGPUMemoryInfo;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 public class MemoryGuard {
 
@@ -37,40 +37,40 @@ public class MemoryGuard {
         return (GL.getCapabilities().GL_ATI_meminfo || GL.getCapabilities().GL_NVX_gpu_memory_info);
     }
 
-    public List<Text> getStatusTooltip(int memoryMB) {
-        final var tooltip = new ArrayList<Text>();
+    public List<Component> getStatusTooltip(int memoryMB) {
+        final var tooltip = new ArrayList<Component>();
 
         tooltip.add(this.usageText("vram", memoryMB, this.availableVramMB(), this.canFitInVram(memoryMB)));
         tooltip.add(this.usageText("ram", memoryMB, this.availableRamMB(), this.canFitInRam(memoryMB)));
 
         if (!this.isSupported()) {
-            tooltip.add(Text.empty());
-            tooltip.add(Translate.gui("no_vram_info_warning").formatted(Formatting.YELLOW));
+            tooltip.add(Component.empty());
+            tooltip.add(Translate.gui("no_vram_info_warning").withStyle(ChatFormatting.YELLOW));
         }
 
         if (!this.canFit(memoryMB)) {
-            tooltip.add(Translate.gui("vram_ignore").formatted(Formatting.GRAY));
+            tooltip.add(Translate.gui("vram_ignore").withStyle(ChatFormatting.GRAY));
         }
 
         return tooltip;
     }
 
-    private MutableText usageText(String key, int usage, int available, boolean fits) {
+    private MutableComponent usageText(String key, int usage, int available, boolean fits) {
         if (available == 0) available = 1;
 
         if (fits) {
             return Translate.gui(
                     key,
-                    Text.literal(usage + "").formatted(Formatting.GRAY),
-                    Text.literal(available + "").formatted(Formatting.GRAY),
-                    Text.literal(usage * 100 / available + "%").formatted(Formatting.GRAY)
+                    Component.literal(usage + "").withStyle(ChatFormatting.GRAY),
+                    Component.literal(available + "").withStyle(ChatFormatting.GRAY),
+                    Component.literal(usage * 100 / available + "%").withStyle(ChatFormatting.GRAY)
             );
         } else {
             return Translate.gui(
                     key,
-                    Text.literal(usage + "").formatted(Formatting.RED),
-                    Text.literal(available + "").formatted(Formatting.GRAY),
-                    Text.literal(usage * 100 / available + "%").formatted(Formatting.RED)
+                    Component.literal(usage + "").withStyle(ChatFormatting.RED),
+                    Component.literal(available + "").withStyle(ChatFormatting.GRAY),
+                    Component.literal(usage * 100 / available + "%").withStyle(ChatFormatting.RED)
             );
         }
     }

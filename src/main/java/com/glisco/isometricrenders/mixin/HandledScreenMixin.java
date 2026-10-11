@@ -1,11 +1,11 @@
 package com.glisco.isometricrenders.mixin;
 
 import com.glisco.isometricrenders.screen.SelectRenderTaskScreen;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,17 +14,17 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(HandledScreen.class)
-public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen {
+@Mixin(AbstractContainerScreen.class)
+public abstract class HandledScreenMixin<T extends AbstractContainerMenu> extends Screen {
 
     @Shadow
     @Final
     protected T handler;
 
     @Shadow
-    public abstract void close();
+    public abstract void onClose();
 
-    protected HandledScreenMixin(Text title) {
+    protected HandledScreenMixin(Component title) {
         super(title);
     }
 
@@ -32,8 +32,8 @@ public abstract class HandledScreenMixin<T extends ScreenHandler> extends Screen
     public void renderInventory(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
         if (keyCode != GLFW.GLFW_KEY_F12 || !Screen.hasControlDown()) return;
 
-        this.close();
-        client.setScreen(new SelectRenderTaskScreen(handler.slots.stream().map(Slot::getStack).filter(stack -> !stack.isEmpty()).toList()));
+        this.onClose();
+        minecraft.setScreen(new SelectRenderTaskScreen(handler.slots.stream().map(Slot::getItem).filter(stack -> !stack.isEmpty()).toList()));
 
         cir.setReturnValue(false);
     }

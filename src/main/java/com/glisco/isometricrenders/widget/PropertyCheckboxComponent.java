@@ -2,15 +2,13 @@ package com.glisco.isometricrenders.widget;
 
 import com.glisco.isometricrenders.property.Property;
 import io.wispforest.owo.ui.component.CheckboxComponent;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.widget.CheckboxWidget;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public class PropertyCheckboxComponent extends CheckboxComponent {
 
     private final Property<Boolean> property;
 
-    public PropertyCheckboxComponent(Text message, Property<Boolean> property) {
+    public PropertyCheckboxComponent(Component message, Property<Boolean> property) {
         super(message);
 
         this.property = property;
@@ -20,6 +18,6 @@ public class PropertyCheckboxComponent extends CheckboxComponent {
     @Override
     public void onPress() {
         super.onPress();
-        property.set(this.isChecked());
+        property.set(this.selected());
     }
 }

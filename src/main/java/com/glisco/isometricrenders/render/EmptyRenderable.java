@@ -2,9 +2,9 @@ package com.glisco.isometricrenders.render;
 
 import com.glisco.isometricrenders.property.PropertyBundle;
 import com.glisco.isometricrenders.util.ExportPathSpec;
+import com.mojang.blaze3d.vertex.PoseStack;
 import io.wispforest.owo.ui.container.FlowLayout;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.renderer.MultiBufferSource;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
@@ -19,7 +19,7 @@ public class EmptyRenderable implements Renderable<PropertyBundle> {
     };
 
     @Override
-    public void emitVertices(MatrixStack matrices, VertexConsumerProvider vertexConsumers, float tickDelta) {}
+    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {}
 
     @Override
     public void draw(Matrix4f modelViewMatrix) {}

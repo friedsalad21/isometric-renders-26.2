@@ -2,32 +2,31 @@ package com.glisco.isometricrenders.widget;
 
 import com.glisco.isometricrenders.property.IntProperty;
 import io.wispforest.owo.ui.core.Sizing;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
-
 import java.util.Objects;
 import java.util.function.Predicate;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.Component;
 
-public class PropertyTextFieldComponent extends TextFieldWidget {
+public class PropertyTextFieldComponent extends EditBox {
 
     private final IntProperty setting;
     private String content = "";
 
     public PropertyTextFieldComponent(Sizing horizontalSizing, IntProperty setting) {
-        super(MinecraftClient.getInstance().textRenderer, 0, 0, 35, 20, Text.empty());
+        super(Minecraft.getInstance().font, 0, 0, 35, 20, Component.empty());
         this.setting = setting;
 
         this.horizontalSizing(horizontalSizing);
 
-        this.setText(String.valueOf(setting.get()));
-        this.setTextPredicate(makeMatcher());
+        this.setValue(String.valueOf(setting.get()));
+        this.setFilter(makeMatcher());
 
         this.setting.listen((integerSetting, integer) -> {
-            this.setText(String.valueOf(integer));
+            this.setValue(String.valueOf(integer));
         });
 
-        this.setChangedListener(s -> {
+        this.setResponder(s -> {
             if (Objects.equals(s, content) || s.length() < 1 || s.equals("-")) {
                 return;
             }

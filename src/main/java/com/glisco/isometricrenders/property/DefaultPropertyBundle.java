@@ -4,13 +4,13 @@ import com.glisco.isometricrenders.render.Renderable;
 import com.glisco.isometricrenders.screen.IsometricUI;
 import com.glisco.isometricrenders.util.ClientRenderCallback;
 import com.glisco.isometricrenders.util.Translate;
+import com.mojang.math.Axis;
 import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.Minecraft;
 import org.joml.Matrix4fStack;
 
 public class DefaultPropertyBundle implements PropertyBundle {
@@ -69,8 +69,8 @@ public class DefaultPropertyBundle implements PropertyBundle {
 
         modelViewStack.translate(this.xOffset.get() / 26000f, this.yOffset.get() / -26000f, 0);
 
-        modelViewStack.rotate(RotationAxis.POSITIVE_X.rotationDegrees(this.slant.get()));
-        modelViewStack.rotate(RotationAxis.POSITIVE_Y.rotationDegrees(this.rotation.get()));
+        modelViewStack.rotate(Axis.XP.rotationDegrees(this.slant.get()));
+        modelViewStack.rotate(Axis.YP.rotationDegrees(this.rotation.get()));
 
         this.updateAndApplyRotationOffset(modelViewStack);
     }
@@ -82,10 +82,10 @@ public class DefaultPropertyBundle implements PropertyBundle {
     protected void updateAndApplyRotationOffset(Matrix4fStack modelViewStack) {
         if (rotationSpeed.get() != 0) {
             if (!this.rotationOffsetUpdated) {
-                rotationOffset += MinecraftClient.getInstance().getRenderTickCounter().getLastFrameDuration() * rotationSpeed.get() * .1f;
+                rotationOffset += Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaTicks() * rotationSpeed.get() * .1f;
                 this.rotationOffsetUpdated = true;
             }
-            modelViewStack.rotate(RotationAxis.POSITIVE_Y.rotationDegrees(rotationOffset));
+            modelViewStack.rotate(Axis.YP.rotationDegrees(rotationOffset));
         } else {
             rotationOffset = 0;
         }

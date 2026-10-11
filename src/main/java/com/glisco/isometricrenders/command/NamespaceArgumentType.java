@@ -8,17 +8,16 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 public class NamespaceArgumentType implements ArgumentType<NamespaceArgumentType.Namespace> {
 
@@ -46,12 +45,12 @@ public class NamespaceArgumentType implements ArgumentType<NamespaceArgumentType
 
     @Override
     public <S> CompletableFuture<Suggestions> listSuggestions(CommandContext<S> context, SuggestionsBuilder builder) {
-        return CommandSource.suggestMatching(getNamespaces(), builder);
+        return SharedSuggestionProvider.suggest(getNamespaces(), builder);
     }
 
     private Set<String> getNamespaces() {
         final var set = new HashSet<String>();
-        for (var id : Registries.ITEM.getIds()) {
+        for (var id : BuiltInRegistries.ITEM.keySet()) {
             set.add(id.getNamespace());
         }
         return set;
@@ -59,10 +58,10 @@ public class NamespaceArgumentType implements ArgumentType<NamespaceArgumentType
 
     public record Namespace(String name) {
         public List<ItemStack> getContent() {
-            return Registries.ITEM.streamEntries()
-                    .filter(entry -> Objects.equals(entry.registryKey().getValue().getNamespace(), this.name))
-                    .map(RegistryEntry.Reference::value)
-                    .map(Item::getDefaultStack)
+            return BuiltInRegistries.ITEM.listElements()
+                    .filter(entry -> Objects.equals(entry.key().location().getNamespace(), this.name))
+                    .map(Holder.Reference::value)
+                    .map(Item::getDefaultInstance)
                     .toList();
         }
     }

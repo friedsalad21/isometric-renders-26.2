@@ -8,14 +8,13 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import net.minecraft.command.CommandSource;
-import net.minecraft.text.Text;
-
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.network.chat.Component;
 
 public class RenderTaskArgumentType implements ArgumentType<RenderTask> {
 
-    private static final SimpleCommandExceptionType EXCEPTION = new SimpleCommandExceptionType(Text.of("mald about it, see if anybody notices"));
+    private static final SimpleCommandExceptionType EXCEPTION = new SimpleCommandExceptionType(Component.nullToEmpty("mald about it, see if anybody notices"));
 
     public static <S> RenderTask getTask(String name, CommandContext<S> context) {
         return context.getArgument(name, RenderTask.class);
@@ -43,9 +42,9 @@ public class RenderTaskArgumentType implements ArgumentType<RenderTask> {
         final var input = builder.getRemaining();
 
         if (input.codePoints().filter(value -> value == ' ').count() > 0 && input.contains("batch")) {
-            return CommandSource.suggestMatching(new String[]{"items", "blocks", "tooltips"}, builder.createOffset(builder.getStart() + 6));
+            return SharedSuggestionProvider.suggest(new String[]{"items", "blocks", "tooltips"}, builder.createOffset(builder.getStart() + 6));
         } else {
-            return CommandSource.suggestMatching(new String[]{"atlas", "batch"}, builder);
+            return SharedSuggestionProvider.suggest(new String[]{"atlas", "batch"}, builder);
         }
     }
 

@@ -3,13 +3,13 @@ package com.glisco.isometricrenders.render;
 import com.glisco.isometricrenders.mixin.access.CameraInvoker;
 import com.glisco.isometricrenders.property.DefaultPropertyBundle;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.Camera;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 import java.util.function.Consumer;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 
 public abstract class DefaultRenderable<P extends DefaultPropertyBundle> implements Renderable<P> {
 
@@ -28,7 +28,7 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
     @Override
     public void draw(Matrix4f modelViewMatrix) {
         // Draw all buffers
-        MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers().draw();
+        Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
     }
 
     protected void renderParticles(Matrix4f transform, float tickDelta) {
@@ -36,12 +36,12 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
         modelView.pushMatrix();
         modelView.mul(transform);
 
-        var client = MinecraftClient.getInstance();
+        var client = Minecraft.getInstance();
         this.withParticleCamera(camera -> {
-            client.particleManager.renderParticles(
+            client.particleEngine.render(
                 camera,
                 tickDelta,
-                MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers()
+                Minecraft.getInstance().renderBuffers().bufferSource()
             );
         });
 
@@ -49,8 +49,8 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
     }
 
     protected void withParticleCamera(Consumer<Camera> action) {
-        Camera camera = MinecraftClient.getInstance().getEntityRenderDispatcher().camera;
-        float previousYaw = camera.getYaw(), previousPitch = camera.getPitch();
+        Camera camera = Minecraft.getInstance().getEntityRenderDispatcher().camera;
+        float previousYaw = camera.getYRot(), previousPitch = camera.getXRot();
 
         ((CameraInvoker) camera).isometric$setRotation(this.properties().rotation.get() + 180 + this.properties().rotationOffset(), this.properties().slant.get());
         action.accept(camera);

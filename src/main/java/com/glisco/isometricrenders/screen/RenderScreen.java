@@ -13,27 +13,15 @@ import com.glisco.isometricrenders.render.TickingRenderable;
 import com.glisco.isometricrenders.util.*;
 import com.glisco.isometricrenders.widget.IOStateComponent;
 import com.glisco.isometricrenders.widget.NotificationComponent;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
 import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.container.Containers;
 import io.wispforest.owo.ui.container.FlowLayout;
-import io.wispforest.owo.ui.core.Color;
-import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.*;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ConfirmLinkScreen;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.option.Perspective;
-import net.minecraft.text.Text;
-import net.minecraft.util.DyeColor;
-import net.minecraft.util.Util;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
@@ -48,6 +36,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import net.minecraft.Util;
+import net.minecraft.client.CameraType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.DyeColor;
 
 import static com.glisco.isometricrenders.property.GlobalProperties.*;
 
@@ -78,7 +76,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     public final Property<Boolean> playAnimations = Property.of(false);
     public final Property<Boolean> tickParticles = Property.of(true);
 
-    private ButtonWidget exportAnimationButton;
+    private Button exportAnimationButton;
 
     private boolean drawOnlyBackground = false;
     private boolean captureScheduled = false;
@@ -97,7 +95,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     private final FlowLayout leftColumn = Containers.verticalFlow(Sizing.fill(100), Sizing.content());
     private final FlowLayout rightColumn = Containers.verticalFlow(Sizing.fill(100), Sizing.content());
 
-    private final List<Framebuffer> renderedFrames = new ArrayList<>();
+    private final List<RenderTarget> renderedFrames = new ArrayList<>();
     private int remainingAnimationFrames;
 
     public RenderScreen(Renderable<?> renderable) {
@@ -151,9 +149,9 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     protected void build(FlowLayout rootComponent) {
-        this.client.options.setPerspective(Perspective.FIRST_PERSON);
+        this.minecraft.options.setCameraType(CameraType.FIRST_PERSON);
 
-        ((ParticleManagerAccessor) MinecraftClient.getInstance().particleManager).isometric$getParticles().clear();
+        ((ParticleManagerAccessor) Minecraft.getInstance().particleEngine).isometric$getParticles().clear();
         IsometricRenders.particleRestriction = this.renderable.particleRestriction();
 
         this.leftColumn.margins(Insets.top(20));
@@ -176,10 +174,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
         IsometricUI.sectionHeader(rightColumn, "render_options", false);
 
         var colorField = IsometricUI.labelledTextField(rightColumn, "#000000", "background_color", Sizing.fixed(50));
-        colorField.setTextPredicate(s -> s.matches("^#([A-Fa-f\\d]{0,6})$"));
-        colorField.setText("#" + String.format("%02X", backgroundColor >> 16) + String.format("%02X", backgroundColor >> 8 & 0xFF) + String.format("%02X", backgroundColor & 0xFF));
-        colorField.setCursorToStart(false);
-        colorField.setChangedListener(s -> {
+        colorField.setFilter(s -> s.matches("^#([A-Fa-f\\d]{0,6})$"));
+        colorField.setValue("#" + String.format("%02X", backgroundColor >> 16) + String.format("%02X", backgroundColor >> 8 & 0xFF) + String.format("%02X", backgroundColor & 0xFF));
+        colorField.moveCursorToStart(false);
+        colorField.setResponder(s -> {
             if (s.substring(1).length() < 6) return;
             backgroundColor = Integer.parseInt(s.substring(1), 16);
         });
@@ -191,13 +189,13 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
         IsometricUI.booleanControl(rightColumn, saveIntoRoot, "dump_into_root");
         IsometricUI.booleanControl(rightColumn, overwriteLatest, "overwrite_latest");
 
-        final ButtonWidget exportButton;
+        final Button exportButton;
         try (var builder = IsometricUI.row(rightColumn)) {
             exportButton = Components.button(Translate.gui("export"), button -> this.captureScheduled = true);
             builder.row.child(exportButton.horizontalSizing(Sizing.fixed(75)));
 
             builder.row.child(Components.button(Translate.gui("open_folder"), button -> {
-                Util.getOperatingSystem().open(this.renderable.exportPath().resolveOffset().toFile());
+                Util.getPlatform().openFile(this.renderable.exportPath().resolveOffset().toFile());
             }).horizontalSizing(Sizing.fixed(75)).margins(Insets.left(5)));
         }
 
@@ -223,9 +221,9 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
         var resolutionField = IsometricUI.labelledTextField(rightColumn, String.valueOf(exportResolution), "renderer_resolution", Sizing.fixed(50));
 
-        resolutionField.setEditableColor(0x00FF00);
-        resolutionField.setTextPredicate(s -> s.matches("\\d{0,5}"));
-        resolutionField.setChangedListener(s -> {
+        resolutionField.setTextColor(0x00FF00);
+        resolutionField.setFilter(s -> s.matches("\\d{0,5}"));
+        resolutionField.setResponder(s -> {
             if (s.isBlank()) return;
             int resolution = Integer.parseInt(s);
 
@@ -234,10 +232,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             // what?
 
             if ((resolution < 16 || resolution > 16384) && !unsafe.get()) {
-                resolutionField.setEditableColor(0xFF0000);
+                resolutionField.setTextColor(0xFF0000);
                 exportButton.active = false;
             } else {
-                resolutionField.setEditableColor(0x00FF00);
+                resolutionField.setTextColor(0x00FF00);
                 exportResolution = resolution;
                 exportButton.active = true;
             }
@@ -248,15 +246,15 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
         if (FFmpegDispatcher.wasFFmpegDetected()) {
             if (FFmpegDispatcher.ffmpegAvailable()) {
                 var framesField = IsometricUI.labelledTextField(rightColumn, String.valueOf(exportFrames), "animation_frames", Sizing.fixed(30));
-                framesField.setTextPredicate(s -> s.matches("\\d*"));
-                framesField.setChangedListener(s -> {
+                framesField.setFilter(s -> s.matches("\\d*"));
+                framesField.setResponder(s -> {
                     if (s.isBlank()) return;
                     exportFrames = Integer.parseInt(s);
                 });
 
                 var framerateField = IsometricUI.labelledTextField(rightColumn, String.valueOf(exportFramerate), "animation_framerate", Sizing.fixed(30));
-                framerateField.setTextPredicate(s -> s.matches("\\d*"));
-                framerateField.setChangedListener(s -> {
+                framerateField.setFilter(s -> s.matches("\\d*"));
+                framerateField.setResponder(s -> {
                     if (s.isBlank()) return;
                     exportFramerate = Integer.parseInt(s);
                 });
@@ -266,7 +264,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                         if (this.memoryGuard.canFit(this.estimateMemoryUsage(exportFrames)) || Screen.hasShiftDown()) {
                             this.remainingAnimationFrames = exportFrames;
 
-                            this.client.getInactivityFpsLimiter().setMaxFps(Integer.parseInt(framerateField.getText()));
+                            this.minecraft.getFramerateLimitTracker().setFramerateLimit(Integer.parseInt(framerateField.getValue()));
                             IsometricRenders.skipNextWorldRender();
 
                             button.active = false;
@@ -283,7 +281,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
                 IsometricUI.dynamicLabel(rightColumn, () -> {
                     return this.remainingAnimationFrames == 0
-                        ? Text.empty()
+                        ? Component.empty()
                         : Translate.gui("export_remaining_frames", this.remainingAnimationFrames);
                 });
             } else {
@@ -292,12 +290,12 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                 IsometricUI.sectionHeader(rightColumn, "no_ffmpeg_3", false)
                     .cursorStyle(CursorStyle.HAND)
                     .mouseDown().subscribe((mouseX, mouseY, button) -> {
-                        this.client.setScreen(new ConfirmLinkScreen(confirmed -> {
+                        this.minecraft.setScreen(new ConfirmLinkScreen(confirmed -> {
                             if (confirmed) {
-                                Util.getOperatingSystem().open("https://ffmpeg.org/download.html");
+                                Util.getPlatform().openUri("https://ffmpeg.org/download.html");
                             }
 
-                            this.client.setScreen(this);
+                            this.minecraft.setScreen(this);
                         }, "https://ffmpeg.org/download.html", true));
                         return true;
                     });
@@ -311,7 +309,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
 
         if (this.guiRebuildScheduled) {
             this.guiRebuildScheduled = false;
@@ -320,26 +318,26 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             this.rightColumn.clearChildren();
             this.leftColumn.clearChildren();
 
-            this.clearAndInit();
+            this.rebuildWidgets();
         }
 
         if (this.drawOnlyBackground) {
             context.fill(0, 0, this.width, this.height, GlobalProperties.backgroundColor | 255 << 24);
         } else {
-            this.renderInGameBackground(context);
+            this.renderTransparentBackground(context);
         }
 
-        context.draw();
+        context.flush();
 
-        final var window = client.getWindow();
-        final var effectiveTickDelta = playAnimations.get() ? client.getRenderTickCounter().getTickDelta(false) : 0;
+        final var window = minecraft.getWindow();
+        final var effectiveTickDelta = playAnimations.get() ? minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false) : 0;
         RenderableDispatcher.drawIntoActiveFramebuffer(
             this.renderable,
-            window.getFramebufferWidth() / (float) window.getFramebufferHeight(),
+            window.getWidth() / (float) window.getHeight(),
             effectiveTickDelta,
             this.hasBothColumns
                 ? matrixStack -> {}
-                : matrixStack -> matrixStack.translate(1 - window.getFramebufferWidth() / (float) window.getFramebufferHeight(), 0, 0)
+                : matrixStack -> matrixStack.translate(1 - window.getWidth() / (float) window.getHeight(), 0, 0)
         );
 
         if (!this.drawOnlyBackground && this.uiAdapter != null) {
@@ -351,7 +349,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             super.render(context, mouseX, mouseY, delta);
 
             if (this.exportAnimationButton != null) {
-                this.exportAnimationButton.tooltip(this.memoryGuard.getStatusTooltip(this.estimateMemoryUsage(exportFrames)).stream().map(text -> TooltipComponent.of(text.asOrderedText())).toList());
+                this.exportAnimationButton.tooltip(this.memoryGuard.getStatusTooltip(this.estimateMemoryUsage(exportFrames)).stream().map(text -> ClientTooltipComponent.create(text.getVisualOrderText())).toList());
             }
 
 //            fill(matrices, viewportEndX + 160, 45, viewportEndX + 168, 53, GlobalProperties.backgroundColor | 255 << 24);
@@ -379,10 +377,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                 this.renderable.exportPath()
             ).whenComplete((file, throwable) -> {
                 exportCallback.accept(file);
-                this.client.execute(() -> this.notify(
-                    () -> Util.getOperatingSystem().open(file),
+                this.minecraft.execute(() -> this.notify(
+                    () -> Util.getPlatform().openFile(file),
                     Translate.gui("exported_as"),
-                    Text.literal(ExportPathSpec.exportRoot().relativize(file.toPath()).toString())
+                    Component.literal(ExportPathSpec.exportRoot().relativize(file.toPath()).toString())
                 ));
             });
 
@@ -395,7 +393,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             IsometricRenders.skipNextWorldRender();
 
             if (--this.remainingAnimationFrames == 0) {
-                this.client.getInactivityFpsLimiter().setMaxFps(this.client.options.getMaxFps().getValue());
+                this.minecraft.getFramerateLimitTracker().setFramerateLimit(this.minecraft.options.framerateLimit().get());
 
                 final var overwriteValue = overwriteLatest.get();
                 overwriteLatest.set(false);
@@ -407,7 +405,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                         RenderableDispatcher.copyFramebufferIntoImage(this.renderedFrames.get(i)),
                         ExportPathSpec.forced("sequence", "seq_" + i)
                     );
-                    this.renderedFrames.get(i).delete();
+                    this.renderedFrames.get(i).destroyBuffers();
                 }
 
                 this.renderedFrames.clear();
@@ -417,7 +415,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                     if (throwable != null) return;
 
                     this.exportAnimationButton.setMessage(Translate.gui("converting"));
-                    this.client.execute(() -> this.notify(Translate.gui("converting_image_sequence")));
+                    this.minecraft.execute(() -> this.notify(Translate.gui("converting_image_sequence")));
 
                     FFmpegDispatcher.assemble(
                         this.renderable.exportPath(),
@@ -427,10 +425,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                         this.exportAnimationButton.active = true;
                         this.exportAnimationButton.setMessage(Translate.gui("export_animation"));
 
-                        this.client.execute(() -> this.notify(
-                            () -> Util.getOperatingSystem().open(animationFile),
+                        this.minecraft.execute(() -> this.notify(
+                            () -> Util.getPlatform().openFile(animationFile),
                             Translate.gui("animation_saved"),
-                            Text.literal(ExportPathSpec.exportRoot().relativize(animationFile.toPath()).toString())
+                            Component.literal(ExportPathSpec.exportRoot().relativize(animationFile.toPath()).toString())
                         ));
                     });
                 });
@@ -440,7 +438,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     public void tick() {
-        if (this.client.world.getTime() % 40 == 0) {
+        if (this.minecraft.level.getGameTime() % 40 == 0) {
             this.memoryGuard.update();
         }
 
@@ -451,11 +449,11 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
         }
     }
 
-    private void notify(@NotNull Runnable onClick, Text... messages) {
+    private void notify(@NotNull Runnable onClick, Component... messages) {
         this.notificationArea.child(0, new NotificationComponent(onClick, messages));
     }
 
-    private void notify(Text... messages) {
+    private void notify(Component... messages) {
         this.notificationArea.child(0, new NotificationComponent(null, messages));
     }
 
@@ -469,8 +467,8 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
         if (this.isInViewport(mouseX)) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE) {
-                double xScaling = (100d / properties.scale.get()) * (this.client.getWindow().getWidth() / (float) this.client.getWindow().getScaledWidth());
-                double yScaling = (100d / properties.scale.get()) * (this.client.getWindow().getHeight() / (float) this.client.getWindow().getScaledHeight());
+                double xScaling = (100d / properties.scale.get()) * (this.minecraft.getWindow().getScreenWidth() / (float) this.minecraft.getWindow().getGuiScaledWidth());
+                double yScaling = (100d / properties.scale.get()) * (this.minecraft.getWindow().getScreenHeight() / (float) this.minecraft.getWindow().getGuiScaledHeight());
 
                 properties.xOffset.modify((int) (50 * deltaX * xScaling));
                 properties.yOffset.modify((int) (50 * deltaY * yScaling));
@@ -547,7 +545,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 
@@ -555,17 +553,17 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     public void removed() {
         this.renderable.dispose();
         IsometricRenders.particleRestriction = ParticleRestriction.always();
-        this.client.getInactivityFpsLimiter().setMaxFps(this.client.options.getMaxFps().getValue());
+        this.minecraft.getFramerateLimitTracker().setFramerateLimit(this.minecraft.options.framerateLimit().get());
     }
 
-    private void drawFramingHint(DrawContext context) {
+    private void drawFramingHint(GuiGraphics context) {
         context.fill(viewportBeginX + 5, 0, viewportEndX - 5, 5, 0x90000000);
         context.fill(viewportBeginX + 5, height - 5, viewportEndX - 5, height, 0x90000000);
         context.fill(viewportBeginX, 0, viewportBeginX + 5, height, 0x90000000);
         context.fill(viewportEndX - 5, 0, viewportEndX, height, 0x90000000);
     }
 
-    private void drawGuiBackground(DrawContext context) {
+    private void drawGuiBackground(GuiGraphics context) {
         context.fill(0, 0, viewportBeginX, height, 0x90000000);
         context.fill(viewportEndX, 0, width, height, 0x90000000);
     }

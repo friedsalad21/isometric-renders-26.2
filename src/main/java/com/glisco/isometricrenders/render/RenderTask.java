@@ -2,12 +2,11 @@ package com.glisco.isometricrenders.render;
 
 import com.glisco.isometricrenders.screen.RenderScreen;
 import com.glisco.isometricrenders.screen.ScreenScheduler;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.ItemStack;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.function.BiConsumer;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
 
 public enum RenderTask {
     ATLAS((source, renderables) -> {

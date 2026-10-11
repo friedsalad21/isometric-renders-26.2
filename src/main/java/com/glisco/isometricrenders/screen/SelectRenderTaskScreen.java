@@ -8,11 +8,11 @@ import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.container.Containers;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.*;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 
 public class SelectRenderTaskScreen extends BaseOwoScreen<FlowLayout> {
 
@@ -45,19 +45,19 @@ public class SelectRenderTaskScreen extends BaseOwoScreen<FlowLayout> {
         contentPanel.child(Containers.verticalFlow(Sizing.content(), Sizing.content())
                 .child(Components.button(Translate.gui("select_item_batch"), (ButtonComponent button) -> {
                     RenderTask.BATCH_ITEM.action.accept("inventory", this.items);
-                    this.close();
+                    this.onClose();
                 }).horizontalSizing(Sizing.fixed(80)).margins(Insets.bottom(5)))
                 .child(Components.button(Translate.gui("select_block_batch"), (ButtonComponent button) -> {
                     RenderTask.BATCH_BLOCK.action.accept("inventory", this.items);
-                    this.close();
+                    this.onClose();
                 }).horizontalSizing(Sizing.fixed(80)).margins(Insets.bottom(5)))
                 .child(Components.button(Translate.gui("select_tooltip_batch"), (ButtonComponent button) -> {
                     RenderTask.BATCH_TOOLTIP.action.accept("inventory", this.items);
-                    this.close();
+                    this.onClose();
                 }).horizontalSizing(Sizing.fixed(80)).margins(Insets.bottom(5)))
                 .child(Components.button(Translate.gui("select_atlas"), (ButtonComponent button) -> {
                     RenderTask.ATLAS.action.accept("inventory", this.items);
-                    this.close();
+                    this.onClose();
                 }).horizontalSizing(Sizing.fixed(80)))
                 .padding(Insets.of(5))
         );
@@ -72,7 +72,7 @@ public class SelectRenderTaskScreen extends BaseOwoScreen<FlowLayout> {
         final var itemContainer = Containers.verticalFlow(Sizing.content(), Sizing.content());
 
         final var itemList = this.items.stream().toList();
-        final var rows = MathHelper.ceilDiv(itemList.size(), 9);
+        final var rows = Mth.positiveCeilDiv(itemList.size(), 9);
         for (int row = 0; row < rows; row++) {
             var rowContainer = Containers.horizontalFlow(Sizing.content(), Sizing.content());
 
@@ -94,7 +94,7 @@ public class SelectRenderTaskScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 

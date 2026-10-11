@@ -3,8 +3,8 @@ package com.glisco.isometricrenders.render;
 import com.glisco.isometricrenders.property.PropertyBundle;
 import com.glisco.isometricrenders.util.ExportPathSpec;
 import com.glisco.isometricrenders.util.ParticleRestriction;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
 import org.joml.Matrix4f;
 
 public interface Renderable<P extends PropertyBundle> {
@@ -15,7 +15,7 @@ public interface Renderable<P extends PropertyBundle> {
 
     default void setupLighting(Matrix4f modelViewMatrix) {}
 
-    void emitVertices(MatrixStack matrices, VertexConsumerProvider vertexConsumers, float tickDelta);
+    void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta);
 
     void draw(Matrix4f modelViewMatrix);
 

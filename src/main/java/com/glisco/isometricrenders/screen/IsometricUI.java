@@ -14,15 +14,14 @@ import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
-
 import java.util.function.Supplier;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.Component;
 
 public class IsometricUI {
 
-    public static TextFieldWidget labelledTextField(FlowLayout container, String content, String key, Sizing sizing) {
+    public static EditBox labelledTextField(FlowLayout container, String content, String key, Sizing sizing) {
         try (var builder = row(container)) {
             final var textBox = Components.textBox(sizing, content);
 
@@ -42,7 +41,7 @@ public class IsometricUI {
         return label;
     }
 
-    public static DynamicLabelComponent dynamicLabel(FlowLayout container, Supplier<Text> content) {
+    public static DynamicLabelComponent dynamicLabel(FlowLayout container, Supplier<Component> content) {
         final var label = new DynamicLabelComponent(content).shadow(false);
         label.margins(Insets.bottom(5));
 
@@ -61,7 +60,7 @@ public class IsometricUI {
         }
     }
 
-    public static void drawExportProgressBar(DrawContext context, int x, int y, int drawWidth, int barWidth, double speed) {
+    public static void drawExportProgressBar(GuiGraphics context, int x, int y, int drawWidth, int barWidth, double speed) {
         int end = x + drawWidth + barWidth;
 
         int offset = (int) (System.currentTimeMillis() / speed % (drawWidth + barWidth));

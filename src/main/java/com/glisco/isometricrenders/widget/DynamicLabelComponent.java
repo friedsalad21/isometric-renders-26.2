@@ -3,21 +3,20 @@ package com.glisco.isometricrenders.widget;
 import io.wispforest.owo.ui.base.BaseComponent;
 import io.wispforest.owo.ui.core.OwoUIDrawContext;
 import io.wispforest.owo.ui.core.Sizing;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.text.Text;
-
 import java.util.function.Supplier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.network.chat.Component;
 
 public class DynamicLabelComponent extends BaseComponent {
 
-    private final TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+    private final Font textRenderer = Minecraft.getInstance().font;
 
-    private final Supplier<Text> content;
+    private final Supplier<Component> content;
     private int color = 0xFFFFFF;
     private boolean shadow = true;
 
-    public DynamicLabelComponent(Supplier<Text> content) {
+    public DynamicLabelComponent(Supplier<Component> content) {
         this.content = content;
     }
 
@@ -38,11 +37,11 @@ public class DynamicLabelComponent extends BaseComponent {
 
     @Override
     protected int determineVerticalContentSize(Sizing sizing) {
-        return this.textRenderer.fontHeight;
+        return this.textRenderer.lineHeight;
     }
 
     @Override
     public void draw(OwoUIDrawContext context, int mouseX, int mouseY, float partialTicks, float delta) {
-        context.drawText(this.textRenderer, this.content.get(), this.x, this.y, this.color, this.shadow);
+        context.drawString(this.textRenderer, this.content.get(), this.x, this.y, this.color, this.shadow);
     }
 }

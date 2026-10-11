@@ -1,6 +1,6 @@
 package com.glisco.isometricrenders.property;
 
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.Mth;
 
 public class IntProperty extends Property<Integer> {
 
@@ -38,7 +38,7 @@ public class IntProperty extends Property<Integer> {
             if (this.value > this.max) this.value -= this.span;
             if (this.value < this.min) this.value += this.span;
         } else {
-            this.value = MathHelper.clamp(this.value + by, this.min, this.max);
+            this.value = Mth.clamp(this.value + by, this.min, this.max);
         }
 
         this.invokeListeners();

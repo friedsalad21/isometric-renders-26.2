@@ -5,58 +5,58 @@ import com.glisco.isometricrenders.property.IntProperty;
 import com.glisco.isometricrenders.screen.IsometricUI;
 import com.glisco.isometricrenders.util.ExportPathSpec;
 import com.glisco.isometricrenders.util.ParticleRestriction;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import io.wispforest.owo.ui.container.FlowLayout;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.LightmapTextureManager;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.SpawnReason;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.math.RotationAxis;
-import net.minecraft.util.math.Vec3d;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 
 public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> implements TickingRenderable<DefaultPropertyBundle> {
 
-    private final MinecraftClient client = MinecraftClient.getInstance();
+    private final Minecraft client = Minecraft.getInstance();
     private final Entity entity;
 
     public EntityRenderable(Entity entity) {
         this.entity = entity;
     }
 
-    public static EntityRenderable of(EntityType<?> type, @Nullable NbtCompound nbt) {
-        final var client = MinecraftClient.getInstance();
+    public static EntityRenderable of(EntityType<?> type, @Nullable CompoundTag nbt) {
+        final var client = Minecraft.getInstance();
 
         if (nbt == null) {
-            nbt = new NbtCompound();
+            nbt = new CompoundTag();
         }
 
-        nbt.putString("id", type.getRegistryEntry().registryKey().getValue().toString());
+        nbt.putString("id", type.builtInRegistryHolder().key().location().toString());
 
-        final var entity = EntityType.loadEntityWithPassengers(nbt, client.world, SpawnReason.LOAD, Function.identity());
-        entity.updatePosition(client.player.getX(), client.player.getY(), client.player.getZ());
+        final var entity = EntityType.loadEntityRecursive(nbt, client.level, EntitySpawnReason.LOAD, Function.identity());
+        entity.absMoveTo(client.player.getX(), client.player.getY(), client.player.getZ());
 
         return new EntityRenderable(entity);
     }
 
     public static EntityRenderable copyOf(Entity source) {
-        final var client = MinecraftClient.getInstance();
+        final var client = Minecraft.getInstance();
 
-        var nbt = new NbtCompound();
-        source.writeNbt(nbt);
-        nbt.putString("id", source.getType().getRegistryEntry().registryKey().getValue().toString());
+        var nbt = new CompoundTag();
+        source.saveWithoutId(nbt);
+        nbt.putString("id", source.getType().builtInRegistryHolder().key().location().toString());
 
-        final var entity = EntityType.loadEntityWithPassengers(nbt, client.world, SpawnReason.LOAD, Function.identity());
+        final var entity = EntityType.loadEntityRecursive(nbt, client.level, EntitySpawnReason.LOAD, Function.identity());
         applyToEntityAndPassengers(entity, Entity::tick);
 
         return new EntityRenderable(entity);
@@ -64,53 +64,53 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
 
     @Override
     public void prepare() {
-        client.getEntityRenderDispatcher().setRenderShadows(false);
+        client.getEntityRenderDispatcher().setRenderShadow(false);
     }
 
     @Override
-    public void emitVertices(MatrixStack matrices, VertexConsumerProvider vertexConsumers, float tickDelta) {
-        matrices.push();
+    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
+        matrices.pushPose();
 
-        matrices.translate(0, -.5 * this.entity.getHeight(), 0);
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180));
+        matrices.translate(0, -.5 * this.entity.getBbHeight(), 0);
+        matrices.mulPose(Axis.YP.rotationDegrees(180));
 
         var properties = this.properties();
-        this.entity.setHeadYaw(properties.yaw.get());
-        if (entity instanceof LivingEntity living) living.prevHeadYaw = properties.yaw.get();
-        this.entity.prevYaw = properties.yaw.get();
+        this.entity.setYHeadRot(properties.yaw.get());
+        if (entity instanceof LivingEntity living) living.yHeadRotO = properties.yaw.get();
+        this.entity.yRotO = properties.yaw.get();
 
-        this.entity.setPitch(properties.pitch.get());
-        this.entity.prevPitch = properties.pitch.get();
+        this.entity.setXRot(properties.pitch.get());
+        this.entity.xRotO = properties.pitch.get();
 
-        final MutableObject<Vec3d> offset = new MutableObject<>(Vec3d.ZERO);
+        final MutableObject<Vec3> offset = new MutableObject<>(Vec3.ZERO);
 
         applyToEntityAndPassengers(this.entity, entity -> {
-            entity.setPos(client.player.getX(), client.player.getY(), client.player.getZ());
-            if (entity.hasVehicle()) {
-                offset.setValue(offset.getValue().add(entity.getVehicle().getPassengerRidingPos(entity).subtract(entity.getPos())));
+            entity.setPosRaw(client.player.getX(), client.player.getY(), client.player.getZ());
+            if (entity.isPassenger()) {
+                offset.setValue(offset.getValue().add(entity.getVehicle().getPassengerRidingPosition(entity).subtract(entity.position())));
             }
 
             var offsetPos = offset.getValue();
-            matrices.push();
-            client.getEntityRenderDispatcher().render(entity, offsetPos.getX(), offsetPos.getY(), offsetPos.getZ(), tickDelta, matrices, vertexConsumers, LightmapTextureManager.MAX_LIGHT_COORDINATE);
-            matrices.pop();
+            matrices.pushPose();
+            client.getEntityRenderDispatcher().render(entity, offsetPos.x(), offsetPos.y(), offsetPos.z(), tickDelta, matrices, vertexConsumers, LightTexture.FULL_BRIGHT);
+            matrices.popPose();
         });
 
-        if (vertexConsumers instanceof VertexConsumerProvider.Immediate immediate) {
-            immediate.draw();
+        if (vertexConsumers instanceof MultiBufferSource.BufferSource immediate) {
+            immediate.endBatch();
         }
 
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-180));
+        matrices.mulPose(Axis.YP.rotationDegrees(-180));
         matrices.translate(0, 1.65, 0);
 
-        this.renderParticles(matrices.peek().getPositionMatrix(), tickDelta);
+        this.renderParticles(matrices.last().pose(), tickDelta);
 
-        matrices.pop();
+        matrices.popPose();
     }
 
     @Override
     public void cleanUp() {
-        client.getEntityRenderDispatcher().setRenderShadows(true);
+        client.getEntityRenderDispatcher().setRenderShadow(true);
     }
 
     @Override
@@ -126,7 +126,7 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
     @Override
     public ExportPathSpec exportPath() {
         return ExportPathSpec.ofIdentified(
-                Registries.ENTITY_TYPE.getId(this.entity.getType()),
+                BuiltInRegistries.ENTITY_TYPE.getKey(this.entity.getType()),
                 "entity"
         );
     }
@@ -134,15 +134,15 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
     @Override
     public void tick() {
         applyToEntityAndPassengers(this.entity, entity -> {
-            if (entity instanceof PlayerEntity) return;
-            client.world.tickEntity(entity);
+            if (entity instanceof Player) return;
+            client.level.tickNonPassenger(entity);
         });
     }
 
     private static void applyToEntityAndPassengers(Entity entity, Consumer<Entity> action) {
         action.accept(entity);
-        if (entity.getPassengerList().isEmpty()) return;
-        for (Entity e : entity.getPassengerList()) applyToEntityAndPassengers(e, action);
+        if (entity.getPassengers().isEmpty()) return;
+        for (Entity e : entity.getPassengers()) applyToEntityAndPassengers(e, action);
     }
 
     public static class EntityPropertyBundle extends DefaultPropertyBundle {

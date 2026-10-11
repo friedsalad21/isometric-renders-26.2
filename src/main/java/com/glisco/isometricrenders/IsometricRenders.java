@@ -6,6 +6,7 @@ import com.glisco.isometricrenders.util.ImageIO;
 import com.glisco.isometricrenders.util.ParticleRestriction;
 import com.glisco.isometricrenders.widget.AreaSelectionComponent;
 import com.glisco.isometricrenders.widget.IOStateComponent;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import io.wispforest.owo.ui.container.Containers;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Positioning;
@@ -19,10 +20,9 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.glfw.GLFW;
@@ -40,9 +40,9 @@ public class IsometricRenders implements ClientModInitializer {
     public static boolean skipWorldRender = false;
     public static boolean centerNextTooltip = false;
 
-    public static Framebuffer mainTargetOverride = null;
+    public static RenderTarget mainTargetOverride = null;
 
-    public static final KeyBinding SELECT = new KeyBinding("key.isometric-renders.area_select", GLFW.GLFW_KEY_C, KeyBinding.MISC_CATEGORY);
+    public static final KeyMapping SELECT = new KeyMapping("key.isometric-renders.area_select", GLFW.GLFW_KEY_C, KeyMapping.CATEGORY_MISC);
 
     @Override
     public void onInitializeClient() {
@@ -53,16 +53,16 @@ public class IsometricRenders implements ClientModInitializer {
         final var ioStateId = "io-state";
         final var areaSelectionHintId = "area-selection-hint";
 
-        var hudId = Identifier.of("isometric-renders", "hud");
+        var hudId = ResourceLocation.fromNamespaceAndPath("isometric-renders", "hud");
         Hud.add(hudId, () -> Containers.verticalFlow(Sizing.content(), Sizing.content()).positioning(Positioning.absolute(20, 20)));
 
         HudRenderCallback.EVENT.register((matrixStack, tickDelta) -> {
-            var client = MinecraftClient.getInstance();
+            var client = Minecraft.getInstance();
             var isometricHud = (FlowLayout) Hud.getComponent(hudId);
 
             final var ioState = isometricHud.childById(IOStateComponent.class, ioStateId);
-            if ((ioState == null) == (ImageIO.taskCount() > 0 && client.currentScreen == null)) {
-                if (ImageIO.taskCount() > 0 && client.currentScreen == null) {
+            if ((ioState == null) == (ImageIO.taskCount() > 0 && client.screen == null)) {
+                if (ImageIO.taskCount() > 0 && client.screen == null) {
                     isometricHud.child(new IOStateComponent().positioning(Positioning.absolute(20, 20)).id(ioStateId));
                 } else {
                     isometricHud.removeChild(ioState);
@@ -80,8 +80,8 @@ public class IsometricRenders implements ClientModInitializer {
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (SELECT.wasPressed()) {
-                if (client.player.isSneaking()) {
+            if (SELECT.consumeClick()) {
+                if (client.player.isShiftKeyDown()) {
                     AreaSelectionHelper.clear();
                 } else {
                     AreaSelectionHelper.select();

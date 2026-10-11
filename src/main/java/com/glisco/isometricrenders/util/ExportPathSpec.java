@@ -2,8 +2,7 @@ package com.glisco.isometricrenders.util;
 
 import com.glisco.isometricrenders.property.GlobalProperties;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.resources.ResourceLocation;
 import java.io.File;
 import java.nio.file.Path;
 
@@ -17,7 +16,7 @@ public record ExportPathSpec(String rootOffset, String filename, boolean ignoreS
         return new ExportPathSpec(rootOffset, filename, true);
     }
 
-    public static ExportPathSpec ofIdentified(Identifier id, String type) {
+    public static ExportPathSpec ofIdentified(ResourceLocation id, String type) {
         return new ExportPathSpec(id.getNamespace() + "/" + type, id.getPath(), false);
     }
 

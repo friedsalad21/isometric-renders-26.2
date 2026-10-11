@@ -5,7 +5,7 @@ import io.wispforest.owo.ui.component.Components;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.*;
 import io.wispforest.owo.ui.util.UISounds;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
@@ -13,7 +13,7 @@ public class NotificationComponent extends FlowLayout {
 
     private float age = 0;
 
-    public NotificationComponent(@Nullable Runnable onClick, Text... messages) {
+    public NotificationComponent(@Nullable Runnable onClick, Component... messages) {
         super(Sizing.content(), Sizing.content(), Algorithm.VERTICAL);
 
         this.margins(Insets.top(5));
