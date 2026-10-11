@@ -16,12 +16,12 @@ import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import java.util.function.Supplier;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.EditBox;
+import io.wispforest.owo.ui.component.TextBoxComponent;
 import net.minecraft.network.chat.Component;
 
 public class IsometricUI {
 
-    public static EditBox labelledTextField(FlowLayout container, String content, String key, Sizing sizing) {
+    public static TextBoxComponent labelledTextField(FlowLayout container, String content, String key, Sizing sizing) {
         try (var builder = row(container)) {
             final var textBox = UIComponents.textBox(sizing, content);
 

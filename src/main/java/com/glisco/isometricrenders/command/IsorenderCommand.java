@@ -1,8 +1,12 @@
 package com.glisco.isometricrenders.command;
 
+import java.net.URI;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
+
 import com.glisco.isometricrenders.IsometricRenders;
 import com.glisco.isometricrenders.mixin.access.BlockStateArgumentAccessor;
-import com.glisco.isometricrenders.mixin.access.DefaultPosArgumentAccessor;
 import com.glisco.isometricrenders.property.GlobalProperties;
 import com.glisco.isometricrenders.render.*;
 import com.glisco.isometricrenders.screen.RenderScreen;
@@ -118,7 +122,7 @@ public class IsorenderCommand {
         source.sendFeedback(Translate.prefixed(Translate.make("version", Component.literal(IsometricRenders.VERSION).withStyle(ChatFormatting.DARK_GRAY)).withStyle(ChatFormatting.GRAY)));
         source.sendFeedback(Translate.prefixed(Translate.make("command_hint").withStyle(
                 style -> style
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, "https://docs.wispforest.io/isometric-renders/slash_isorender/"))
+                        .withClickEvent(new ClickEvent.OpenUrl(URI.create("https://docs.wispforest.io/isometric-renders/slash_isorender/")))
                         .applyFormat(ChatFormatting.UNDERLINE)
                         .applyFormat(ChatFormatting.GRAY)
         )));
@@ -138,13 +142,7 @@ public class IsorenderCommand {
     }
 
     private static int renderPlayerWithNbt(CommandContext<FabricClientCommandSource> context) {
-        final var server = Minecraft.getInstance().getSingleplayerServer();
-        if (server == null) {
-            Translate.commandError(context, "player_rendering_in_multiplayer");
-            return 0;
-        }
-
-        final var gameProfile = server.getProfileCache().get(StringArgumentType.getString(context, "player"));
+        final var gameProfile = Minecraft.getInstance().services().profileResolver().fetchByName(StringArgumentType.getString(context, "player"));
         if (gameProfile.isEmpty()) {
             Translate.commandError(context, "no_such_player");
             return 0;
@@ -152,9 +150,7 @@ public class IsorenderCommand {
 
         final var playerNbt = CompoundTagArgument.getCompoundTag(context, "nbt");
         final var player = EntityComponent.createRenderablePlayer(gameProfile.get());
-        ((LocalPlayer) player).load(
-                playerNbt
-        );
+        player.load(TagValueInput.create(new ProblemReporter.ScopedCollector(IsometricRenders.LOGGER), Minecraft.getInstance().level.registryAccess(), playerNbt));
 
         ScreenScheduler.schedule(new RenderScreen(
                 new EntityRenderable(player)
@@ -164,13 +160,7 @@ public class IsorenderCommand {
     }
 
     private static int renderPlayerWithoutNbt(CommandContext<FabricClientCommandSource> context) {
-        final var server = Minecraft.getInstance().getSingleplayerServer();
-        if (server == null) {
-            Translate.commandError(context, "player_rendering_in_multiplayer");
-            return 0;
-        }
-
-        final var gameProfile = server.getProfileCache().get(StringArgumentType.getString(context, "player"));
+        final var gameProfile = Minecraft.getInstance().services().profileResolver().fetchByName(StringArgumentType.getString(context, "player"));
         if (gameProfile.isEmpty()) {
             Translate.commandError(context, "no_such_player");
             return 0;
@@ -185,9 +175,9 @@ public class IsorenderCommand {
 
     private static int renderSelf(CommandContext<FabricClientCommandSource> context) {
         final var player = EntityComponent.createRenderablePlayer(Minecraft.getInstance().player.getGameProfile());
-        ((LocalPlayer) player).load(
-                Minecraft.getInstance().player.saveWithoutId(new CompoundTag())
-        );
+        final var output = TagValueOutput.createWithContext(new ProblemReporter.ScopedCollector(IsometricRenders.LOGGER), Minecraft.getInstance().level.registryAccess());
+        Minecraft.getInstance().player.saveWithoutId(output);
+        player.load(TagValueInput.create(new ProblemReporter.ScopedCollector(IsometricRenders.LOGGER), Minecraft.getInstance().level.registryAccess(), output.buildResult()));
 
         ScreenScheduler.schedule(new RenderScreen(
                 new EntityRenderable(player)
@@ -223,7 +213,7 @@ public class IsorenderCommand {
 
     private static int renderItemWithArgument(CommandContext<FabricClientCommandSource> context) throws CommandSyntaxException {
         ScreenScheduler.schedule(new RenderScreen(
-                new ItemRenderable(ItemArgument.getItem(context, "item").createItemStack(1, false))
+                new ItemRenderable(ItemArgument.getItem(context, "item").createItemStack(1))
         ));
         return 0;
     }
@@ -237,7 +227,7 @@ public class IsorenderCommand {
 
     private static int renderItemTooltipWithArgument(CommandContext<FabricClientCommandSource> context) throws CommandSyntaxException {
         ScreenScheduler.schedule(new RenderScreen(
-                new TooltipRenderable(ItemArgument.getItem(context, "item").createItemStack(1, false))
+                new TooltipRenderable(ItemArgument.getItem(context, "item").createItemStack(1))
         ));
         return 0;
     }
@@ -345,9 +335,7 @@ public class IsorenderCommand {
 
     public static BlockPos getPosFromArgument(WorldCoordinates argument, FabricClientCommandSource source) {
 
-        DefaultPosArgumentAccessor accessor = (DefaultPosArgumentAccessor) argument;
         Vec3 pos = source.getPlayer().position();
-
-        return BlockPos.containing(accessor.isometric$getX().get(pos.x), accessor.isometric$getY().get(pos.y), accessor.isometric$getZ().get(pos.z));
+        return BlockPos.containing(argument.x().get(pos.x), argument.y().get(pos.y), argument.z().get(pos.z));
     }
 }

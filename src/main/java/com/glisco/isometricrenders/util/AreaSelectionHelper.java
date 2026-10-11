@@ -1,17 +1,17 @@
 package com.glisco.isometricrenders.util;
 
+import net.minecraft.gizmos.GizmoStyle;
+import net.minecraft.gizmos.Gizmos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+
 import com.glisco.isometricrenders.render.AreaRenderable;
 import com.glisco.isometricrenders.screen.RenderScreen;
 import com.glisco.isometricrenders.screen.ScreenScheduler;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.*;
 import com.mojang.blaze3d.vertex.*;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -31,7 +31,7 @@ public class AreaSelectionHelper {
         Translate.actionBar("selection_cleared");
     }
 
-    public static void renderSelectionBox(PoseStack matrices, Camera camera) {
+    public static void renderSelectionBox() {
         if (!AreaSelectionHelper.shouldDraw()) return;
 
         Minecraft client = Minecraft.getInstance();
@@ -46,14 +46,10 @@ public class AreaSelectionHelper {
         origin = origin.offset(size.getX() < 0 ? 1 : 0, size.getY() < 0 ? 1 : 0, size.getZ() < 0 ? 1 : 0);
         size = size.offset(size.getX() >= 0 ? 1 : -1, size.getY() >= 0 ? 1 : -1, size.getZ() >= 0 ? 1 : -1);
 
-        matrices.pushPose();
-
-        VertexConsumer consumer = client.renderBuffers().bufferSource().getBuffer(RenderType.lines());
-        matrices.translate(origin.getX() - camera.getPosition().x, origin.getY() - camera.getPosition().y, origin.getZ() - camera.getPosition().z);
-
-        ShapeRenderer.renderLineBox(matrices, consumer, 0, 0, 0, size.getX(), size.getY(), size.getZ(), 1, 1, 1, 1, 0, 0, 0);
-
-        matrices.popPose();
+        final var box = new AABB(Vec3.atLowerCornerOf(origin), Vec3.atLowerCornerOf(origin.offset(size)));
+        try (var collection = client.levelRenderer.collectPerFrameRenderThreadGizmos()) {
+            Gizmos.cuboid(box, GizmoStyle.stroke(0xFFFFFFFF));
+        }
     }
 
     public static void select() {

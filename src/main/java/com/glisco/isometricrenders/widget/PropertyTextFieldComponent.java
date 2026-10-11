@@ -5,19 +5,17 @@ import io.wispforest.owo.ui.core.Sizing;
 import java.util.Objects;
 import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.EditBox;
+import io.wispforest.owo.ui.component.TextBoxComponent;
 import net.minecraft.network.chat.Component;
 
-public class PropertyTextFieldComponent extends EditBox {
+public class PropertyTextFieldComponent extends TextBoxComponent {
 
     private final IntProperty setting;
     private String content = "";
 
     public PropertyTextFieldComponent(Sizing horizontalSizing, IntProperty setting) {
-        super(Minecraft.getInstance().font, 0, 0, 35, 20, Component.empty());
+        super(horizontalSizing);
         this.setting = setting;
-
-        this.horizontalSizing(horizontalSizing);
 
         this.setValue(String.valueOf(setting.get()));
         this.setFilter(makeMatcher());

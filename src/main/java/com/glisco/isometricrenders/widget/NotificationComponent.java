@@ -22,8 +22,8 @@ public class NotificationComponent extends FlowLayout {
 
         if (onClick != null) {
             this.cursorStyle(CursorStyle.HAND);
-            this.mouseDown().subscribe((mouseX, mouseY, button) -> {
-                if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
+            this.mouseDown().subscribe((click, doubled) -> {
+                if (click.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false;
 
                 onClick.run();
                 UISounds.playInteractionSound();

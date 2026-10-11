@@ -8,8 +8,8 @@ public class ScreenScheduler {
     private static Screen SCHEDULED_SCREEN = null;
 
     public static void schedule(Screen screen) {
-        if (Minecraft.getInstance().screen == null) {
-            Minecraft.getInstance().setScreen(screen);
+        if (Minecraft.getInstance().gui.screen() == null) {
+            Minecraft.getInstance().gui.setScreen(screen);
         } else {
             SCHEDULED_SCREEN = screen;
         }
@@ -20,7 +20,7 @@ public class ScreenScheduler {
     }
 
     public static void open() {
-        Minecraft.getInstance().setScreen(SCHEDULED_SCREEN);
+        Minecraft.getInstance().gui.setScreen(SCHEDULED_SCREEN);
         SCHEDULED_SCREEN = null;
     }
 

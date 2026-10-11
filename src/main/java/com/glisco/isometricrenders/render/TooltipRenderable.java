@@ -1,6 +1,5 @@
 package com.glisco.isometricrenders.render;
 
-import com.glisco.isometricrenders.IsometricRenders;
 import com.glisco.isometricrenders.property.DefaultPropertyBundle;
 import com.glisco.isometricrenders.screen.IsometricUI;
 import com.glisco.isometricrenders.util.ExportPathSpec;
@@ -8,8 +7,13 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.wispforest.owo.ui.container.FlowLayout;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.MultiBufferSource;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Matrix4fStack;
@@ -23,12 +27,48 @@ public class TooltipRenderable extends DefaultRenderable<TooltipRenderable.Toolt
     }
 
     @Override
-    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
-        IsometricRenders.centerNextTooltip = true;
+    public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {
+        final var client = Minecraft.getInstance();
+        final var font = client.font;
 
-        var client = Minecraft.getInstance();
-        new GuiGraphicsExtractor(client, client.renderBuffers().bufferSource())
-                .renderTooltip(client.font, this.stack, 0, 0);
+        // 26.x tooltips only exist as GUI render state, so we rebuild
+        // the classic tooltip look from submittable text and quads
+        // ponytail: text lines only, tooltip images (bundles etc.) are not drawn
+        final var lines = Screen.getTooltipFromItem(client, this.stack).stream().map(Component::getVisualOrderText).toList();
+        if (lines.isEmpty()) return;
+
+        final int width = lines.stream().mapToInt(font::width).max().orElse(0);
+        final int height = lines.size() * 10 + (lines.size() > 1 ? 2 : 0) - 2;
+
+        final int x = -width / 2, y = -height / 2;
+
+        collector.submitCustomGeometry(matrices, RenderTypes.textBackground(), (pose, buffer) -> {
+            final int background = 0xF0100010, borderStart = 0x505000FF, borderEnd = 0x5028007F;
+
+            quad(pose, buffer, x - 3, y - 4, x + width + 3, y - 3, background, background);
+            quad(pose, buffer, x - 3, y + height + 3, x + width + 3, y + height + 4, background, background);
+            quad(pose, buffer, x - 3, y - 3, x + width + 3, y + height + 3, background, background);
+            quad(pose, buffer, x - 4, y - 3, x - 3, y + height + 3, background, background);
+            quad(pose, buffer, x + width + 3, y - 3, x + width + 4, y + height + 3, background, background);
+
+            quad(pose, buffer, x - 3, y - 2, x - 2, y + height + 2, borderStart, borderEnd);
+            quad(pose, buffer, x + width + 2, y - 2, x + width + 3, y + height + 2, borderStart, borderEnd);
+            quad(pose, buffer, x - 3, y - 3, x + width + 3, y - 2, borderStart, borderStart);
+            quad(pose, buffer, x - 3, y + height + 2, x + width + 3, y + height + 3, borderEnd, borderEnd);
+        });
+
+        int lineY = y;
+        for (int i = 0; i < lines.size(); i++) {
+            collector.submitText(matrices, x, lineY, lines.get(i), true, Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, -1, 0, 0);
+            lineY += i == 0 ? 12 : 10;
+        }
+    }
+
+    private static void quad(PoseStack.Pose pose, VertexConsumer buffer, int x0, int y0, int x1, int y1, int topColor, int bottomColor) {
+        buffer.addVertex(pose, x0, y0, 0).setColor(topColor).setLight(LightCoordsUtil.FULL_BRIGHT);
+        buffer.addVertex(pose, x0, y1, 0).setColor(bottomColor).setLight(LightCoordsUtil.FULL_BRIGHT);
+        buffer.addVertex(pose, x1, y1, 0).setColor(bottomColor).setLight(LightCoordsUtil.FULL_BRIGHT);
+        buffer.addVertex(pose, x1, y0, 0).setColor(topColor).setLight(LightCoordsUtil.FULL_BRIGHT);
     }
 
     @Override

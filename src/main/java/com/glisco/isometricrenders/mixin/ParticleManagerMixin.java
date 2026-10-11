@@ -16,7 +16,7 @@ public class ParticleManagerMixin {
 
     @Inject(method = "addParticle(Lnet/minecraft/client/particle/Particle;)V", at = @At("HEAD"), cancellable = true)
     public void stopParticles(Particle particle, CallbackInfo ci) {
-        if (!(Minecraft.getInstance().screen instanceof RenderScreen screen)) return;
+        if (!(Minecraft.getInstance().gui.screen() instanceof RenderScreen screen)) return;
         if (!screen.tickParticles.get()) {
             ci.cancel();
             return;

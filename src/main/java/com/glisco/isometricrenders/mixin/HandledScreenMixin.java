@@ -3,6 +3,7 @@ package com.glisco.isometricrenders.mixin;
 import com.glisco.isometricrenders.screen.SelectRenderTaskScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
@@ -19,23 +20,18 @@ public abstract class HandledScreenMixin<T extends AbstractContainerMenu> extend
 
     @Shadow
     @Final
-    protected T handler;
-
-    @Shadow
-    public abstract void onClose();
+    protected T menu;
 
     protected HandledScreenMixin(Component title) {
         super(title);
     }
 
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
-    public void renderInventory(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
-        if (keyCode != GLFW.GLFW_KEY_F12 || !Screen.hasControlDown()) return;
+    public void renderInventory(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
+        if (event.key() != GLFW.GLFW_KEY_F12 || !this.minecraft.hasControlDown()) return;
 
         this.onClose();
-        minecraft.setScreen(new SelectRenderTaskScreen(handler.slots.stream().map(Slot::getItem).filter(stack -> !stack.isEmpty()).toList()));
-
+        this.minecraft.gui.setScreen(new SelectRenderTaskScreen(this.menu.slots.stream().map(Slot::getItem).filter(stack -> !stack.isEmpty()).toList()));
         cir.setReturnValue(false);
     }
-
 }

@@ -42,6 +42,6 @@ public class DynamicLabelComponent extends BaseUIComponent {
 
     @Override
     public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
-        context.drawString(this.textRenderer, this.content.get(), this.x, this.y, this.color, this.shadow);
+        context.text(this.textRenderer, this.content.get(), this.x, this.y, this.color, this.shadow);
     }
 }

@@ -57,6 +57,6 @@ public class Translate {
     }
 
     public static void actionBar(String key, Object... args) {
-        Minecraft.getInstance().player.displayClientMessage(make(key, args), true);
+        Minecraft.getInstance().player.sendOverlayMessage(make(key, args));
     }
 }

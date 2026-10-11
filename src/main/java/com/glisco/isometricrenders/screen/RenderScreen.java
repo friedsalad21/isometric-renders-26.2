@@ -1,8 +1,6 @@
 package com.glisco.isometricrenders.screen;
 
 import com.glisco.isometricrenders.IsometricRenders;
-import com.glisco.isometricrenders.mixin.access.NativeImageInvoker;
-import com.glisco.isometricrenders.mixin.access.ParticleManagerAccessor;
 import com.glisco.isometricrenders.property.DefaultPropertyBundle;
 import com.glisco.isometricrenders.property.GlobalProperties;
 import com.glisco.isometricrenders.property.Property;
@@ -13,9 +11,12 @@ import com.glisco.isometricrenders.render.TickingRenderable;
 import com.glisco.isometricrenders.util.*;
 import com.glisco.isometricrenders.widget.IOStateComponent;
 import com.glisco.isometricrenders.widget.NotificationComponent;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.glisco.isometricrenders.render.PreviewRenderer;
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
+import io.wispforest.owo.ui.component.ButtonComponent;
 import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.container.FlowLayout;
@@ -24,14 +25,12 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.opengl.GL11;
 
-import java.awt.*;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.awt.GraphicsEnvironment;
+import java.awt.Toolkit;
+import java.nio.file.Files;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.Channels;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -76,7 +75,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     public final Property<Boolean> playAnimations = Property.of(false);
     public final Property<Boolean> tickParticles = Property.of(true);
 
-    private Button exportAnimationButton;
+    private ButtonComponent exportAnimationButton;
 
     private boolean drawOnlyBackground = false;
     private boolean captureScheduled = false;
@@ -95,7 +94,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     private final FlowLayout leftColumn = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
     private final FlowLayout rightColumn = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 
-    private final List<RenderTarget> renderedFrames = new ArrayList<>();
+    private final List<CompletableFuture<NativeImage>> renderedFrames = new ArrayList<>();
+
+    // GPU work has to happen during the render phase, see PreviewRenderer
+    private final List<Runnable> renderPhaseTasks = new ArrayList<>();
     private int remainingAnimationFrames;
 
     public RenderScreen(Renderable<?> renderable) {
@@ -151,7 +153,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     protected void build(FlowLayout rootComponent) {
         this.minecraft.options.setCameraType(CameraType.FIRST_PERSON);
 
-        ((ParticleManagerAccessor) Minecraft.getInstance().particleEngine).isometric$getParticles().clear();
+        Minecraft.getInstance().particleEngine.clearParticles();
         IsometricRenders.particleRestriction = this.renderable.particleRestriction();
 
         this.leftColumn.margins(Insets.top(20));
@@ -189,7 +191,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
         IsometricUI.booleanControl(rightColumn, saveIntoRoot, "dump_into_root");
         IsometricUI.booleanControl(rightColumn, overwriteLatest, "overwrite_latest");
 
-        final Button exportButton;
+        final ButtonComponent exportButton;
         try (var builder = IsometricUI.row(rightColumn)) {
             exportButton = UIComponents.button(Translate.gui("export"), button -> this.captureScheduled = true);
             builder.row.child(exportButton.horizontalSizing(Sizing.fixed(75)));
@@ -204,17 +206,19 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
                 this.notify(Translate.gui("copied_to_clipboard"));
 
-                try (var image = RenderableDispatcher.drawIntoImage(this.renderable, 0, exportResolution)) {
-                    var stream = new ByteArrayOutputStream();
-                    var channel = Channels.newChannel(stream);
+                this.renderPhaseTasks.add(() -> RenderableDispatcher.drawIntoImage(this.renderable, 0, exportResolution).thenAcceptAsync(image -> {
+                    try (image) {
+                        final var file = Files.createTempFile("isometric-renders", ".png");
+                        image.writeToFile(file);
 
-                    ((NativeImageInvoker) (Object) image).isometric$write(channel);
+                        final var transferable = new ImageTransferable(javax.imageio.ImageIO.read(file.toFile()));
+                        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(transferable, transferable);
 
-                    final var transferable = new ImageTransferable(javax.imageio.ImageIO.read(new ByteArrayInputStream(stream.toByteArray())));
-                    Toolkit.getDefaultToolkit().getSystemClipboard().setContents(transferable, transferable);
-                } catch (IOException e) {
-                    IsometricRenders.LOGGER.error("mfw", e);
-                }
+                        Files.deleteIfExists(file);
+                    } catch (IOException e) {
+                        IsometricRenders.LOGGER.error("Could not copy render to clipboard", e);
+                    }
+                }, Util.ioPool()));
 
             }).horizontalSizing(Sizing.fixed(75)));
         }
@@ -261,7 +265,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
                 try (var builder = IsometricUI.row(rightColumn)) {
                     this.exportAnimationButton = UIComponents.button(Translate.gui("export_animation"), button -> {
-                        if (this.memoryGuard.canFit(this.estimateMemoryUsage(exportFrames)) || Screen.hasShiftDown()) {
+                        if (this.memoryGuard.canFit(this.estimateMemoryUsage(exportFrames)) || Minecraft.getInstance().hasShiftDown()) {
                             this.remainingAnimationFrames = exportFrames;
 
                             this.minecraft.getFramerateLimitTracker().setFramerateLimit(Integer.parseInt(framerateField.getValue()));
@@ -289,13 +293,13 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                 IsometricUI.sectionHeader(rightColumn, "no_ffmpeg_2", false);
                 IsometricUI.sectionHeader(rightColumn, "no_ffmpeg_3", false)
                     .cursorStyle(CursorStyle.HAND)
-                    .mouseDown().subscribe((mouseX, mouseY, button) -> {
-                        this.minecraft.setScreen(new ConfirmLinkScreen(confirmed -> {
+                    .mouseDown().subscribe((click, doubled) -> {
+                        this.minecraft.gui.setScreen(new ConfirmLinkScreen(confirmed -> {
                             if (confirmed) {
                                 Util.getPlatform().openUri("https://ffmpeg.org/download.html");
                             }
 
-                            this.minecraft.setScreen(this);
+                            this.minecraft.gui.setScreen(this);
                         }, "https://ffmpeg.org/download.html", true));
                         return true;
                     });
@@ -309,7 +313,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (this.guiRebuildScheduled) {
             this.guiRebuildScheduled = false;
@@ -324,43 +328,58 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
         if (this.drawOnlyBackground) {
             context.fill(0, 0, this.width, this.height, GlobalProperties.backgroundColor | 255 << 24);
         } else {
-            this.renderTransparentBackground(context);
+            this.extractTransparentBackground(context);
         }
-
-        context.flush();
 
         final var window = minecraft.getWindow();
         final var effectiveTickDelta = playAnimations.get() ? minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false) : 0;
-        RenderableDispatcher.drawIntoActiveFramebuffer(
+
+        if (this.captureScheduled) {
+            this.captureScheduled = false;
+            this.renderPhaseTasks.add(() -> RenderableDispatcher.drawIntoImage(this.renderable, 0, exportResolution)
+                .thenCompose(image -> ImageIO.save(image, this.renderable.exportPath()))
+                .whenComplete((file, throwable) -> {
+                    if (throwable != null) return;
+
+                    exportCallback.accept(file);
+                    this.minecraft.execute(() -> this.notify(
+                        () -> Util.getPlatform().openFile(file),
+                        Translate.gui("exported_as"),
+                        Component.literal(ExportPathSpec.exportRoot().relativize(file.toPath()).toString())
+                    ));
+                }));
+        }
+
+        if (this.remainingAnimationFrames > 0) {
+            this.renderPhaseTasks.add(() -> this.renderedFrames.add(RenderableDispatcher.drawIntoImage(this.renderable, effectiveTickDelta, exportResolution)));
+            IsometricRenders.skipNextWorldRender();
+
+            if (--this.remainingAnimationFrames == 0) {
+                this.renderPhaseTasks.add(this::assembleAnimation);
+            }
+        }
+
+        final var tasks = List.copyOf(this.renderPhaseTasks);
+        this.renderPhaseTasks.clear();
+
+        context.guiRenderState.addPicturesInPictureState(new PreviewRenderer.State(
+            0, 0, this.width, this.height,
             this.renderable,
-            window.getWidth() / (float) window.getHeight(),
             effectiveTickDelta,
-            this.hasBothColumns
-                ? matrixStack -> {}
-                : matrixStack -> matrixStack.translate(1 - window.getWidth() / (float) window.getHeight(), 0, 0)
-        );
+            this.hasBothColumns ? 0 : 1 - window.getWidth() / (float) window.getHeight(),
+            () -> tasks.forEach(Runnable::run)
+        ));
+        context.nextStratum();
 
         if (!this.drawOnlyBackground && this.uiAdapter != null) {
-            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT);
-
             drawFramingHint(context);
             drawGuiBackground(context);
 
-            super.render(context, mouseX, mouseY, delta);
+            super.extractRenderState(context, mouseX, mouseY, delta);
 
             if (this.exportAnimationButton != null) {
-                this.exportAnimationButton.tooltip(this.memoryGuard.getStatusTooltip(this.estimateMemoryUsage(exportFrames)).stream().map(text -> ClientTooltipComponent.create(text.getVisualOrderText())).toList());
+                this.exportAnimationButton.tooltip(this.memoryGuard.getStatusTooltip(this.estimateMemoryUsage(exportFrames)));
             }
-
-//            fill(matrices, viewportEndX + 160, 45, viewportEndX + 168, 53, GlobalProperties.backgroundColor | 255 << 24);
-
-//            client.textRenderer.draw(matrices, Translate.gui("hotkeys"), viewportEndX + 12, height - 20, 0xAAAAAA);
-//
-//            client.textRenderer.draw(matrices, Translate.gui("memory_warning1"), 10, height - 60, 0xAAAAAA);
-//            client.textRenderer.draw(matrices, Translate.gui("memory_warning2"), 10, height - 50, 0xAAAAAA);
-//            client.textRenderer.draw(matrices, Translate.gui("memory_warning3"), 10, height - 40, 0xAAAAAA);
-//            client.textRenderer.draw(matrices, Translate.gui("memory_warning4"), 10, height - 30, 0xAAAAAA);
-//            client.textRenderer.draw(matrices, Translate.gui("memory_warning5"), 10, height - 20, 0xAAAAAA);
 
             if (ImageIO.taskCount() > 0) {
                 if (!this.ioStateComponent.hasParent()) {
@@ -370,70 +389,48 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                 this.notificationArea.removeChild(this.ioStateComponent);
             }
         }
+    }
 
-        if (this.captureScheduled) {
-            ImageIO.save(
-                RenderableDispatcher.drawIntoImage(this.renderable, 0, exportResolution),
-                this.renderable.exportPath()
-            ).whenComplete((file, throwable) -> {
-                exportCallback.accept(file);
-                this.minecraft.execute(() -> this.notify(
-                    () -> Util.getPlatform().openFile(file),
-                    Translate.gui("exported_as"),
-                    Component.literal(ExportPathSpec.exportRoot().relativize(file.toPath()).toString())
-                ));
+    private void assembleAnimation() {
+        this.minecraft.getFramerateLimitTracker().setFramerateLimit(this.minecraft.options.framerateLimit().get());
+
+        final var frames = List.copyOf(this.renderedFrames);
+        this.renderedFrames.clear();
+
+        final var overwriteValue = overwriteLatest.get();
+        overwriteLatest.set(false);
+
+        CompletableFuture.allOf(frames.toArray(CompletableFuture[]::new)).thenCompose(unused -> {
+            final var saves = new ArrayList<CompletableFuture<File>>();
+            for (int i = 0; i < frames.size(); i++) {
+                saves.add(ImageIO.save(frames.get(i).join(), ExportPathSpec.forced("sequence", "seq_" + i)));
+            }
+            return CompletableFuture.allOf(saves.toArray(CompletableFuture[]::new));
+        }).whenComplete((unused, throwable) -> {
+            overwriteLatest.set(overwriteValue);
+            if (throwable != null) return;
+
+            this.minecraft.execute(() -> {
+                this.exportAnimationButton.setMessage(Translate.gui("converting"));
+                this.notify(Translate.gui("converting_image_sequence"));
             });
 
-            this.captureScheduled = false;
-        }
+            FFmpegDispatcher.assemble(
+                this.renderable.exportPath(),
+                ExportPathSpec.exportRoot().resolve("sequence/"),
+                animationFormat
+            ).whenComplete((animationFile, animationThrowable) -> this.minecraft.execute(() -> {
+                this.exportAnimationButton.active = true;
+                this.exportAnimationButton.setMessage(Translate.gui("export_animation"));
 
-        if (this.remainingAnimationFrames > 0) {
-            this.renderedFrames.add(RenderableDispatcher.drawIntoTexture(this.renderable, effectiveTickDelta, exportResolution));
-
-            IsometricRenders.skipNextWorldRender();
-
-            if (--this.remainingAnimationFrames == 0) {
-                this.minecraft.getFramerateLimitTracker().setFramerateLimit(this.minecraft.options.framerateLimit().get());
-
-                final var overwriteValue = overwriteLatest.get();
-                overwriteLatest.set(false);
-
-                CompletableFuture<File> exportFuture = null;
-
-                for (int i = 0; i < this.renderedFrames.size(); i++) {
-                    exportFuture = ImageIO.save(
-                        RenderableDispatcher.copyFramebufferIntoImage(this.renderedFrames.get(i)),
-                        ExportPathSpec.forced("sequence", "seq_" + i)
-                    );
-                    this.renderedFrames.get(i).destroyBuffers();
-                }
-
-                this.renderedFrames.clear();
-
-                exportFuture.whenComplete((file, throwable) -> {
-                    overwriteLatest.set(overwriteValue);
-                    if (throwable != null) return;
-
-                    this.exportAnimationButton.setMessage(Translate.gui("converting"));
-                    this.minecraft.execute(() -> this.notify(Translate.gui("converting_image_sequence")));
-
-                    FFmpegDispatcher.assemble(
-                        this.renderable.exportPath(),
-                        ExportPathSpec.exportRoot().resolve("sequence/"),
-                        animationFormat
-                    ).whenComplete((animationFile, animationThrowable) -> {
-                        this.exportAnimationButton.active = true;
-                        this.exportAnimationButton.setMessage(Translate.gui("export_animation"));
-
-                        this.minecraft.execute(() -> this.notify(
-                            () -> Util.getPlatform().openFile(animationFile),
-                            Translate.gui("animation_saved"),
-                            Component.literal(ExportPathSpec.exportRoot().relativize(animationFile.toPath()).toString())
-                        ));
-                    });
-                });
-            }
-        }
+                if (animationThrowable != null) return;
+                this.notify(
+                    () -> Util.getPlatform().openFile(animationFile),
+                    Translate.gui("animation_saved"),
+                    Component.literal(ExportPathSpec.exportRoot().relativize(animationFile.toPath()).toString())
+                );
+            }));
+        });
     }
 
     @Override
@@ -462,10 +459,11 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (!(this.renderable.properties() instanceof DefaultPropertyBundle properties)) return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        if (!(this.renderable.properties() instanceof DefaultPropertyBundle properties)) return super.mouseDragged(event, deltaX, deltaY);
 
-        if (this.isInViewport(mouseX)) {
+        if (this.isInViewport(event.x())) {
+            final int button = event.button();
             if (button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE) {
                 double xScaling = (100d / properties.scale.get()) * (this.minecraft.getWindow().getScreenWidth() / (float) this.minecraft.getWindow().getGuiScaledWidth());
                 double yScaling = (100d / properties.scale.get()) * (this.minecraft.getWindow().getScreenHeight() / (float) this.minecraft.getWindow().getGuiScaledHeight());
@@ -482,14 +480,15 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             }
         }
 
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return super.mouseDragged(event, deltaX, deltaY);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!(this.renderable.properties() instanceof DefaultPropertyBundle properties)) return super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (!(this.renderable.properties() instanceof DefaultPropertyBundle properties)) return super.mouseClicked(event, doubleClick);
 
-        if (this.isInViewport(mouseX) && Screen.hasControlDown()) {
+        if (this.isInViewport(event.x()) && this.minecraft.hasControlDown()) {
+            final int button = event.button();
             if (button == GLFW.GLFW_MOUSE_BUTTON_MIDDLE) {
                 properties.xOffset.setToDefault();
                 properties.yOffset.setToDefault();
@@ -501,7 +500,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
@@ -519,9 +518,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (super.keyPressed(keyCode, scanCode, modifiers)) return true;
+    public boolean keyPressed(KeyEvent event) {
+        if (super.keyPressed(event)) return true;
 
+        final int keyCode = event.key();
         if (keyCode == GLFW.GLFW_KEY_F12) {
             this.captureScheduled = true;
         } else if (keyCode == GLFW.GLFW_KEY_F10) {

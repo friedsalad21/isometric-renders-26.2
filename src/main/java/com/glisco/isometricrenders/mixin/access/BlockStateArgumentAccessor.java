@@ -7,8 +7,6 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(BlockInput.class)
 public interface BlockStateArgumentAccessor {
-
-    @Accessor("data")
+    @Accessor("tag")
     CompoundTag isometric$getData();
-
 }

@@ -59,7 +59,7 @@ public class NamespaceArgumentType implements ArgumentType<NamespaceArgumentType
     public record Namespace(String name) {
         public List<ItemStack> getContent() {
             return BuiltInRegistries.ITEM.listElements()
-                    .filter(entry -> Objects.equals(entry.key().location().getNamespace(), this.name))
+                    .filter(entry -> Objects.equals(entry.key().identifier().getNamespace(), this.name))
                     .map(Holder.Reference::value)
                     .map(Item::getDefaultInstance)
                     .toList();

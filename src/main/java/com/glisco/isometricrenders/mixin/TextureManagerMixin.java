@@ -14,7 +14,7 @@ public class TextureManagerMixin {
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     public void stopTick(CallbackInfo ci) {
         final var client = Minecraft.getInstance();
-        if (client.screen instanceof RenderScreen screen && !screen.playAnimations.get()) {
+        if (client.gui.screen() instanceof RenderScreen screen && !screen.playAnimations.get()) {
             ci.cancel();
         }
     }
