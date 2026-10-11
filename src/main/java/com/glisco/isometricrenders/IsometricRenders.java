@@ -7,7 +7,7 @@ import com.glisco.isometricrenders.util.ParticleRestriction;
 import com.glisco.isometricrenders.widget.AreaSelectionComponent;
 import com.glisco.isometricrenders.widget.IOStateComponent;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import io.wispforest.owo.ui.container.Containers;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Positioning;
 import io.wispforest.owo.ui.core.Sizing;
@@ -17,20 +17,20 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.minecraft.resources.Identifier;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import org.lwjgl.glfw.GLFW;
 
 @Environment(EnvType.CLIENT)
 public class IsometricRenders implements ClientModInitializer {
 
-    public static final Logger LOGGER = LogManager.getLogger();
+    public static final Logger LOGGER = LoggerFactory.getLogger("isometric-renders");
     public static final String VERSION = FabricLoader.getInstance().getModContainer("isometric-renders").get().getMetadata().getVersion().getFriendlyString();
 
     public static ParticleRestriction<?> particleRestriction = ParticleRestriction.always();
@@ -48,13 +48,13 @@ public class IsometricRenders implements ClientModInitializer {
     public void onInitializeClient() {
         ClientCommandRegistrationCallback.EVENT.register(IsorenderCommand::register);
 
-        KeyBindingHelper.registerKeyBinding(SELECT);
+        KeyMappingHelper.registerKeyBinding(SELECT);
 
         final var ioStateId = "io-state";
         final var areaSelectionHintId = "area-selection-hint";
 
-        var hudId = ResourceLocation.fromNamespaceAndPath("isometric-renders", "hud");
-        Hud.add(hudId, () -> Containers.verticalFlow(Sizing.content(), Sizing.content()).positioning(Positioning.absolute(20, 20)));
+        var hudId = Identifier.fromNamespaceAndPath("isometric-renders", "hud");
+        Hud.add(hudId, () -> UIContainers.verticalFlow(Sizing.content(), Sizing.content()).positioning(Positioning.absolute(20, 20)));
 
         HudRenderCallback.EVENT.register((matrixStack, tickDelta) -> {
             var client = Minecraft.getInstance();

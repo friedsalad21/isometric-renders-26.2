@@ -4,7 +4,7 @@ import com.glisco.isometricrenders.screen.IsometricUI;
 import com.glisco.isometricrenders.util.ImageIO;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
-import io.wispforest.owo.ui.core.OwoUIDrawContext;
+import io.wispforest.owo.ui.core.OwoUIGraphics;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
 
@@ -20,7 +20,7 @@ public class IOStateComponent extends FlowLayout {
     }
 
     @Override
-    public void draw(OwoUIDrawContext context, int mouseX, int mouseY, float partialTicks, float delta) {
+    public void draw(OwoUIGraphics context, int mouseX, int mouseY, float partialTicks, float delta) {
         super.draw(context, mouseX, mouseY, partialTicks, delta);
         IsometricUI.drawExportProgressBar(context, this.x + 10, this.y + 25, 100, 50, 10);
     }

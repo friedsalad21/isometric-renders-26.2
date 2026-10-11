@@ -1,13 +1,21 @@
 package com.glisco.isometricrenders.render;
 
+import com.glisco.isometricrenders.IsometricRenders;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.block.BlockModelRenderState;
+import net.minecraft.client.renderer.block.model.BlockDisplayContext;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.phys.Vec3;
+
 import com.glisco.isometricrenders.mixin.access.BlockEntityAccessor;
 import com.glisco.isometricrenders.property.DefaultPropertyBundle;
 import com.glisco.isometricrenders.util.ExportPathSpec;
 import com.glisco.isometricrenders.util.ParticleRestriction;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -60,20 +68,24 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
     }
 
     @Override
-    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
+    public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {
         matrices.pushPose();
         matrices.translate(-0.5, -0.5, -0.5);
 
         if (this.state.getRenderShape() != RenderShape.INVISIBLE) {
-            this.client.getBlockRenderer().renderSingleBlock(this.state, matrices, vertexConsumers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+            final var modelState = new BlockModelRenderState();
+            this.client.getModelManager().getBlockModelSet().get(this.state).update(modelState, this.state, BlockDisplayContext.create(), 42);
+            modelState.submit(matrices, collector, LightCoordsUtil.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 0);
         }
 
-        if (this.entity != null && this.client.getBlockEntityRenderDispatcher().getRenderer(this.entity) != null) {
-            this.client.getBlockEntityRenderDispatcher().getRenderer(this.entity).render(entity, tickDelta, matrices, vertexConsumers, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-        }
-
-        if (vertexConsumers instanceof MultiBufferSource.BufferSource immediate) {
-            immediate.endBatch();
+        if (this.entity != null) {
+            final var renderer = this.client.getBlockEntityRenderDispatcher().getRenderer(this.entity);
+            if (renderer != null) {
+                final var entityState = renderer.createRenderState();
+                renderer.extractRenderState(this.entity, entityState, tickDelta, Vec3.ZERO, null);
+                entityState.lightCoords = LightCoordsUtil.FULL_BRIGHT;
+                renderer.submit(entityState, matrices, collector, new CameraRenderState());
+            }
         }
 
         double xOffset = this.client.player.getX() % 1d;
@@ -83,7 +95,7 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
         if (zOffset < 0) zOffset += 1;
 
         matrices.translate(xOffset, 1.65 + this.client.player.getY() % 1d, zOffset);
-        this.renderParticles(matrices.last().pose(), tickDelta);
+        this.renderParticles(matrices, tickDelta);
 
         matrices.popPose();
     }
@@ -98,8 +110,8 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
             ticker.tick(client.level, client.player.blockPosition(), this.state, this.entity);
         }
 
-        if (client.level.random.nextDouble() < 0.150) {
-            this.state.getBlock().animateTick(this.state, client.level, client.player.blockPosition(), client.level.random);
+        if (client.level.getRandom().nextDouble() < 0.150) {
+            this.state.getBlock().animateTick(this.state, client.level, client.player.blockPosition(), client.level.getRandom());
         }
     }
 
@@ -124,7 +136,7 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
     private static void prepareBlockEntity(BlockState state, BlockEntity blockEntity, @Nullable CompoundTag nbt) {
         if (blockEntity == null) return;
 
-        ((BlockEntityAccessor) blockEntity).isometric$setCachedState(state);
+        ((BlockEntityAccessor) blockEntity).isometric$setBlockState(state);
         blockEntity.setLevel(Minecraft.getInstance().level);
 
         if (nbt == null) return;
@@ -135,6 +147,6 @@ public class BlockStateRenderable extends DefaultRenderable<DefaultPropertyBundl
         nbtCopy.putInt("y", 0);
         nbtCopy.putInt("z", 0);
 
-        blockEntity.loadWithComponents(nbtCopy, Minecraft.getInstance().level.registryAccess());
+        blockEntity.loadWithComponents(TagValueInput.create(new ProblemReporter.ScopedCollector(IsometricRenders.LOGGER), Minecraft.getInstance().level.registryAccess(), nbtCopy));
     }
 }

@@ -14,7 +14,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 
@@ -37,7 +37,7 @@ public class TagArgumentType implements ArgumentType<TagArgumentType.TagArgument
     @Override
     public TagArgument parse(StringReader reader) throws CommandSyntaxException {
         reader.expect('#');
-        final var tagId = ResourceLocation.read(reader);
+        final var tagId = Identifier.read(reader);
         return registryWrapper.get(TagKey.create(Registries.ITEM, tagId))
                 .map(entryList -> new TagArgument(tagId, entryList))
                 .orElseThrow(() -> UNKNOWN_TAG_EXCEPTION.createWithContext(reader, tagId));
@@ -48,5 +48,5 @@ public class TagArgumentType implements ArgumentType<TagArgumentType.TagArgument
         return SharedSuggestionProvider.suggestResource(this.registryWrapper.listTags().map(named -> named.key().location()), builder, String.valueOf('#'));
     }
 
-    public record TagArgument(ResourceLocation id, HolderSet<Item> entries) {}
+    public record TagArgument(Identifier id, HolderSet<Item> entries) {}
 }

@@ -1,5 +1,11 @@
 package com.glisco.isometricrenders.render;
 
+import com.glisco.isometricrenders.IsometricRenders;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueOutput;
+
 import com.glisco.isometricrenders.property.DefaultPropertyBundle;
 import com.glisco.isometricrenders.property.IntProperty;
 import com.glisco.isometricrenders.screen.IsometricUI;
@@ -14,8 +20,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
@@ -41,10 +46,8 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
             nbt = new CompoundTag();
         }
 
-        nbt.putString("id", type.builtInRegistryHolder().key().location().toString());
-
-        final var entity = EntityType.loadEntityRecursive(nbt, client.level, EntitySpawnReason.LOAD, Function.identity());
-        entity.absMoveTo(client.player.getX(), client.player.getY(), client.player.getZ());
+        final var entity = EntityType.loadEntityRecursive(type, nbt, client.level, EntitySpawnReason.LOAD, e -> e);
+        entity.absSnapTo(client.player.getX(), client.player.getY(), client.player.getZ());
 
         return new EntityRenderable(entity);
     }
@@ -52,23 +55,17 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
     public static EntityRenderable copyOf(Entity source) {
         final var client = Minecraft.getInstance();
 
-        var nbt = new CompoundTag();
-        source.saveWithoutId(nbt);
-        nbt.putString("id", source.getType().builtInRegistryHolder().key().location().toString());
+        final var output = TagValueOutput.createWithContext(new ProblemReporter.ScopedCollector(IsometricRenders.LOGGER), client.level.registryAccess());
+        source.saveWithoutId(output);
 
-        final var entity = EntityType.loadEntityRecursive(nbt, client.level, EntitySpawnReason.LOAD, Function.identity());
+        final var entity = EntityType.loadEntityRecursive(source.getType(), output.buildResult(), client.level, EntitySpawnReason.LOAD, e -> e);
         applyToEntityAndPassengers(entity, Entity::tick);
 
         return new EntityRenderable(entity);
     }
 
     @Override
-    public void prepare() {
-        client.getEntityRenderDispatcher().setRenderShadow(false);
-    }
-
-    @Override
-    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
+    public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {
         matrices.pushPose();
 
         matrices.translate(0, -.5 * this.entity.getBbHeight(), 0);
@@ -83,6 +80,8 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
         this.entity.xRotO = properties.pitch.get();
 
         final MutableObject<Vec3> offset = new MutableObject<>(Vec3.ZERO);
+        final var dispatcher = client.getEntityRenderDispatcher();
+        final var camera = new CameraRenderState();
 
         applyToEntityAndPassengers(this.entity, entity -> {
             entity.setPosRaw(client.player.getX(), client.player.getY(), client.player.getZ());
@@ -90,27 +89,23 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
                 offset.setValue(offset.getValue().add(entity.getVehicle().getPassengerRidingPosition(entity).subtract(entity.position())));
             }
 
+            final var state = dispatcher.extractEntity(entity, tickDelta);
+            state.lightCoords = LightCoordsUtil.FULL_BRIGHT;
+            state.shadowPieces.clear();
+            state.nameTag = null;
+
             var offsetPos = offset.getValue();
             matrices.pushPose();
-            client.getEntityRenderDispatcher().render(entity, offsetPos.x(), offsetPos.y(), offsetPos.z(), tickDelta, matrices, vertexConsumers, LightTexture.FULL_BRIGHT);
+            dispatcher.submit(state, camera, offsetPos.x(), offsetPos.y(), offsetPos.z(), matrices, collector);
             matrices.popPose();
         });
-
-        if (vertexConsumers instanceof MultiBufferSource.BufferSource immediate) {
-            immediate.endBatch();
-        }
 
         matrices.mulPose(Axis.YP.rotationDegrees(-180));
         matrices.translate(0, 1.65, 0);
 
-        this.renderParticles(matrices.last().pose(), tickDelta);
+        this.renderParticles(matrices, tickDelta);
 
         matrices.popPose();
-    }
-
-    @Override
-    public void cleanUp() {
-        client.getEntityRenderDispatcher().setRenderShadow(true);
     }
 
     @Override

@@ -2,12 +2,12 @@ package com.glisco.isometricrenders.widget;
 
 import com.glisco.isometricrenders.IsometricRenders;
 import com.glisco.isometricrenders.util.Translate;
-import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.Surface;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -24,9 +24,9 @@ public class AreaSelectionComponent extends FlowLayout {
         this.surface(Surface.flat(0x77000000).and(Surface.outline(0x77000000)));
         this.padding(Insets.of(5));
 
-        this.child(Components.label(Translate.PREFIX).shadow(true).margins(Insets.bottom(10)));
+        this.child(UIComponents.label(Translate.PREFIX).shadow(true).margins(Insets.bottom(10)));
 
-        this.child(Components.label(Translate.gui("hud.area_selection")));
+        this.child(UIComponents.label(Translate.gui("hud.area_selection")));
         this.child(new DynamicLabelComponent(
                 positionText(() -> pos1, "from"))
                 .shadow(false).horizontalSizing(Sizing.fixed(Minecraft.getInstance().font.width(positionText(() -> pos1, "from").get())))
@@ -36,7 +36,7 @@ public class AreaSelectionComponent extends FlowLayout {
                 .shadow(false).margins(Insets.bottom(10))
         );
 
-        this.child(Components.label(Translate.gui("hud.area_selection.clear_hint", KeyBindingHelper.getBoundKeyOf(IsometricRenders.SELECT).getDisplayName())));
+        this.child(UIComponents.label(Translate.gui("hud.area_selection.clear_hint", KeyMappingHelper.getBoundKeyOf(IsometricRenders.SELECT).getDisplayName())));
     }
 
     private static Supplier<Component> positionText(Supplier<BlockPos> pos, String name) {

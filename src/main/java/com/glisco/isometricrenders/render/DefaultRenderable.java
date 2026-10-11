@@ -2,16 +2,28 @@ package com.glisco.isometricrenders.render;
 
 import com.glisco.isometricrenders.mixin.access.CameraInvoker;
 import com.glisco.isometricrenders.property.DefaultPropertyBundle;
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.Std140Builder;
+import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.state.level.ParticlesRenderState;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-
-import java.util.function.Consumer;
-import net.minecraft.client.Camera;
-import net.minecraft.client.Minecraft;
+import org.lwjgl.system.MemoryStack;
 
 public abstract class DefaultRenderable<P extends DefaultPropertyBundle> implements Renderable<P> {
+
+    private static GpuBuffer lightBuffer;
+
+    private @Nullable SubmitNodeStorage pendingParticles;
+    private final Matrix4f particleTransform = new Matrix4f();
 
     @Override
     public void setupLighting(Matrix4f modelViewMatrix) {
@@ -22,38 +34,55 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
         lightDirection.mul(lightTransform);
 
         final var transformedLightDirection = new Vector3f(lightDirection.x, lightDirection.y, lightDirection.z);
-        RenderSystem.setShaderLights(transformedLightDirection, transformedLightDirection);
+
+        if (lightBuffer == null) {
+            lightBuffer = RenderSystem.getDevice().createBuffer(() -> "isometric-renders lighting", GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST, Lighting.UBO_SIZE);
+        }
+
+        try (var stack = MemoryStack.stackPush()) {
+            final var data = Std140Builder.onStack(stack, Lighting.UBO_SIZE).putVec3(transformedLightDirection).putVec3(transformedLightDirection).get();
+            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(lightBuffer.slice(), data);
+        }
+
+        RenderSystem.setShaderLights(lightBuffer.slice());
     }
 
     @Override
     public void draw(Matrix4f modelViewMatrix) {
-        // Draw all buffers
-        Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
-    }
+        if (this.pendingParticles == null) return;
 
-    protected void renderParticles(Matrix4f transform, float tickDelta) {
-        var modelView = RenderSystem.getModelViewStack();
+        // Particles are positioned relative to the camera, so
+        // they need their own model view matrix
+        final var modelView = RenderSystem.getModelViewStack();
         modelView.pushMatrix();
-        modelView.mul(transform);
+        modelView.mul(this.particleTransform);
 
-        var client = Minecraft.getInstance();
-        this.withParticleCamera(camera -> {
-            client.particleEngine.render(
-                camera,
-                tickDelta,
-                Minecraft.getInstance().renderBuffers().bufferSource()
-            );
-        });
+        Minecraft.getInstance().gameRenderer.featureRenderDispatcher().renderAllFeatures(this.pendingParticles);
 
         modelView.popMatrix();
+        this.pendingParticles = null;
     }
 
-    protected void withParticleCamera(Consumer<Camera> action) {
-        Camera camera = Minecraft.getInstance().getEntityRenderDispatcher().camera;
-        float previousYaw = camera.getYRot(), previousPitch = camera.getXRot();
+    protected void renderParticles(PoseStack matrices, float tickDelta) {
+        final var client = Minecraft.getInstance();
+        final var camera = client.gameRenderer.mainCamera();
+        final float previousYaw = camera.yRot(), previousPitch = camera.xRot();
 
         ((CameraInvoker) camera).isometric$setRotation(this.properties().rotation.get() + 180 + this.properties().rotationOffset(), this.properties().slant.get());
-        action.accept(camera);
+
+        final var cameraState = new CameraRenderState();
+        camera.extractRenderState(cameraState, tickDelta);
+
+        // ponytail: cull-everything-far-away frustum, particles are restricted to the render's surroundings anyway
+        final var frustum = new Frustum(new Matrix4f(), new Matrix4f().setOrtho(-512, 512, -512, 512, -512, 512));
+        frustum.prepare(camera.position().x, camera.position().y, camera.position().z);
+
+        final var particles = new ParticlesRenderState();
+        client.particleEngine.extract(particles, frustum, camera, tickDelta);
+
+        this.pendingParticles = new SubmitNodeStorage();
+        particles.submit(this.pendingParticles, cameraState);
+        this.particleTransform.set(matrices.last().pose());
 
         ((CameraInvoker) camera).isometric$setRotation(previousYaw, previousPitch);
     }

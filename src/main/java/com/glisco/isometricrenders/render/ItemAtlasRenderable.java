@@ -11,8 +11,9 @@ import org.joml.Matrix4fStack;
 
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.util.LightCoordsUtil;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -30,7 +31,7 @@ public class ItemAtlasRenderable extends DefaultRenderable<ItemAtlasRenderable.I
     }
 
     @Override
-    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
+    public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {
         final int columns = this.properties().columns.get();
         final int rows = Mth.positiveCeilDiv(this.items.size(), columns);
 
@@ -47,16 +48,9 @@ public class ItemAtlasRenderable extends DefaultRenderable<ItemAtlasRenderable.I
                 final var index = row * columns + column;
                 if (index >= this.items.size()) continue;
 
-                this.client.getItemRenderer().renderStatic(
-                        this.items.get(index),
-                        ItemDisplayContext.GUI,
-                        LightTexture.FULL_BRIGHT,
-                        OverlayTexture.NO_OVERLAY,
-                        matrices,
-                        vertexConsumers,
-                        this.client.level,
-                        0
-                );
+                final var state = new ItemStackRenderState();
+                this.client.getItemModelResolver().updateForTopItem(state, this.items.get(index), ItemDisplayContext.GUI, this.client.level, null, 0);
+                state.submit(matrices, collector, LightCoordsUtil.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, 0);
             }
             matrices.popPose();
         }

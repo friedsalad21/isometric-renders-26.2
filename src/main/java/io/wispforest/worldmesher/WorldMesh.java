@@ -1,35 +1,29 @@
 package io.wispforest.worldmesher;
 
 import com.google.common.collect.HashMultimap;
-import com.mojang.blaze3d.buffers.BufferUsage;
+import com.mojang.blaze3d.PrimitiveTopology;
+import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexBuffer;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.IndexType;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import io.wispforest.worldmesher.render.FluidVertexConsumer;
 import io.wispforest.worldmesher.render.MeshRenderView;
-import net.fabricmc.fabric.api.renderer.v1.Renderer;
-import net.fabricmc.fabric.impl.client.indigo.renderer.IndigoRenderer;
-import net.fabricmc.fabric.impl.client.indigo.renderer.render.WorldMesherRenderContext;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.render.*;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.SectionBufferBuilderPack;
-import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.BlockQuadOutput;
+import net.minecraft.client.renderer.block.FluidRenderer;
+import net.minecraft.client.renderer.block.ModelBlockRenderer;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.Level;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
@@ -40,6 +34,7 @@ import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +68,14 @@ public class WorldMesh {
     private @Nullable CompletableFuture<Void> buildFuture = null;
 
     // Vertex storage
-    private final Map<RenderType, VertexBuffer> bufferStorage = new HashMap<>();
+    private final Map<ChunkSectionLayer, UploadedLayer> bufferStorage = new EnumMap<>(ChunkSectionLayer.class);
+
+    private record UploadedLayer(GpuBuffer vertices, @Nullable GpuBuffer indices, IndexType indexType, int indexCount) {
+        void close() {
+            this.vertices.close();
+            if (this.indices != null) this.indices.close();
+        }
+    }
 
     private WorldMesh(BlockAndTintGetter world, BlockPos from, BlockPos to, boolean cull, boolean useGlobalNeighbors, boolean freezeEntities, Runnable renderStartAction, Runnable renderEndAction, TriFunction<Player, BlockPos, BlockPos, List<Entity>> entitySupplier) {
         this.from = from;
@@ -95,39 +97,42 @@ public class WorldMesh {
     }
 
     /**
-     * Renders this world mesh into the current framebuffer, translated using the given matrix
+     * Renders this world mesh into the current output target, the given
+     * matrix is applied on top of the current model view matrix
      *
-     * @param matrices The translation matrices. This is applied to the entire mesh
+     * @param transform The transform to apply to the entire mesh
      */
-    public void render(PoseStack matrices) {
+    public void render(Matrix4f transform) {
         if (!this.canRender()) {
             throw new IllegalStateException("World mesh not prepared!");
         }
 
-        var matrix = matrices.last().pose();
-        var translucent = RenderType.translucent();
+        final var modelView = RenderSystem.getModelViewStack();
+        modelView.pushMatrix();
+        modelView.mul(transform);
 
-        this.bufferStorage.forEach((renderLayer, vertexBuffer) -> {
-            if (renderLayer == translucent) return;
-            this.drawBuffer(vertexBuffer, renderLayer, matrix);
+        // Enum order puts translucent last
+        this.bufferStorage.forEach((layer, uploaded) -> {
+            renderStartAction.run();
+
+            final var indices = uploaded.indices != null
+                    ? uploaded.indices
+                    : RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).getBuffer(uploaded.indexCount);
+
+            renderTypeFor(layer).prepare().drawFromBuffer(uploaded.vertices, indices, uploaded.indexType, 0, 0, uploaded.indexCount);
+
+            renderEndAction.run();
         });
 
-        if (this.bufferStorage.containsKey(translucent)) {
-            this.drawBuffer(bufferStorage.get(translucent), translucent, matrix);
-        }
-
-        VertexBuffer.unbind();
+        modelView.popMatrix();
     }
 
-    private void drawBuffer(VertexBuffer vertexBuffer, RenderType renderLayer, Matrix4f matrix) {
-        renderLayer.setupRenderState();
-        renderStartAction.run();
-
-        vertexBuffer.bind();
-        vertexBuffer.drawWithShader(matrix, RenderSystem.getProjectionMatrix(), RenderSystem.getShader());
-
-        renderEndAction.run();
-        renderLayer.clearRenderState();
+    private static RenderType renderTypeFor(ChunkSectionLayer layer) {
+        return switch (layer) {
+            case SOLID -> RenderTypes.solidMovingBlock();
+            case CUTOUT -> RenderTypes.cutoutMovingBlock();
+            case TRANSLUCENT -> RenderTypes.translucentMovingBlock();
+        };
     }
 
     /**
@@ -222,7 +227,7 @@ public class WorldMesh {
      * all vertex buffers in the process
      */
     public void reset() {
-        this.bufferStorage.forEach((renderLayer, vertexBuffer) -> vertexBuffer.close());
+        this.bufferStorage.values().forEach(UploadedLayer::close);
         this.bufferStorage.clear();
 
         this.state = MeshState.NEW;
@@ -274,29 +279,22 @@ public class WorldMesh {
     }
 
     private void build() {
-        var allocatorStorage = new SectionBufferBuilderPack();
-
         var client = Minecraft.getInstance();
-        var blockRenderManager = client.getBlockRenderer();
+        var modelManager = client.getModelManager();
 
-        var matrices = new PoseStack();
-        var builderStorage = new HashMap<RenderType, BufferBuilder>();
-        var random = RandomSource.createNewThreadLocalInstance();
+        var blockRenderer = new ModelBlockRenderer(client.options.ambientOcclusion().get(), this.cull, client.getBlockColors());
+        var fluidRenderer = new FluidRenderer(modelManager.getFluidStateModelSet());
 
-        WorldMesherRenderContext renderContext = null;
-        try {
-            //noinspection UnstableApiUsage
-            renderContext = Renderer.get() instanceof IndigoRenderer
-                    ? new WorldMesherRenderContext(this.world, layer -> this.getOrCreateBuilder(allocatorStorage, builderStorage, layer))
-                    : null;
-        } catch (Throwable throwable) {
-            var fabricApiVersion = FabricLoader.getInstance().getModContainer("worldmesher").get().getMetadata().getCustomValue("worldmesher:fabric_api_build_version").getAsString();
-            LOGGER.error(
-                    "Could not create a context for rendering Fabric API models. This is most likely due to an incompatible Fabric API version - this build of WorldMesher was compiled against '{}', try that instead",
-                    fabricApiVersion,
-                    throwable
-            );
-        }
+        var builders = new EnumMap<ChunkSectionLayer, BufferBuilder>(ChunkSectionLayer.class);
+        var allocators = new EnumMap<ChunkSectionLayer, ByteBufferBuilder>(ChunkSectionLayer.class);
+        Function<ChunkSectionLayer, BufferBuilder> builderFor = layer -> builders.computeIfAbsent(layer, $ -> {
+            var allocator = allocators.computeIfAbsent(layer, $$ -> new ByteBufferBuilder(layer.bufferSize()));
+            return new BufferBuilder(allocator, PrimitiveTopology.QUADS, layer.vertexFormat());
+        });
+
+        BlockQuadOutput quadOutput = (x, y, z, quad, instance) -> builderFor.apply(quad.materialInfo().layer()).putBlockBakedQuad(x, y, z, quad, instance);
+        BlockQuadOutput opaqueQuadOutput = (x, y, z, quad, instance) -> builderFor.apply(ChunkSectionLayer.SOLID).putBlockBakedQuad(x, y, z, quad, instance);
+        boolean cutoutLeaves = client.options.cutoutLeaves().get();
 
         this.entitiesFrozen = this.freezeEntities;
         var entitiesFuture = new CompletableFuture<List<DynamicRenderInfo.EntityEntry>>();
@@ -336,63 +334,72 @@ public class WorldMesh {
 
             var renderPos = pos.subtract(from);
             if (world.getBlockEntity(pos) != null) {
-                blockEntities.put(renderPos, world.getBlockEntity(pos));
+                blockEntities.put(renderPos.immutable(), world.getBlockEntity(pos));
             }
 
-            if (!world.getFluidState(pos).isEmpty()) {
-                var fluidState = world.getFluidState(pos);
-                var fluidLayer = ItemBlockRenderTypes.getRenderLayer(fluidState);
+            var fluidState = state.getFluidState();
+            if (!fluidState.isEmpty()) {
+                // The fluid renderer emits section-relative positions
+                var fluidTransform = new Matrix4f().translation(
+                        renderPos.getX() - (pos.getX() & 15),
+                        renderPos.getY() - (pos.getY() & 15),
+                        renderPos.getZ() - (pos.getZ() & 15)
+                );
 
-                matrices.pushPose();
-                matrices.translate(-(pos.getX() & 15), -(pos.getY() & 15), -(pos.getZ() & 15));
-                matrices.translate(renderPos.getX(), renderPos.getY(), renderPos.getZ());
-
-                blockRenderManager.renderLiquid(pos, world, new FluidVertexConsumer(this.getOrCreateBuilder(allocatorStorage, builderStorage, fluidLayer), matrices.last().pose()), state, fluidState);
-
-                matrices.popPose();
+                fluidRenderer.tesselate(this.world, pos, layer -> new FluidVertexConsumer(builderFor.apply(layer), fluidTransform), state, fluidState);
             }
 
-            matrices.pushPose();
-            matrices.translate(renderPos.getX(), renderPos.getY(), renderPos.getZ());
-
-            var blockLayer = ItemBlockRenderTypes.getChunkRenderType(state);
-
-            final var model = blockRenderManager.getBlockModel(state);
-            if (renderContext != null && !model.isVanillaAdapter()) {
-                renderContext.tessellateBlock(this.world, state, pos, model, matrices);
-            } else if (state.getRenderShape() == RenderShape.MODEL) {
-                blockRenderManager.getModelRenderer().tesselateBlock(this.world, model, state, pos, matrices, this.getOrCreateBuilder(allocatorStorage, builderStorage, blockLayer), cull, random, state.getSeed(pos), OverlayTexture.NO_OVERLAY);
+            if (state.getRenderShape() == RenderShape.MODEL) {
+                blockRenderer.tesselateBlock(
+                        ModelBlockRenderer.forceOpaque(cutoutLeaves, state) ? opaqueQuadOutput : quadOutput,
+                        renderPos.getX(), renderPos.getY(), renderPos.getZ(),
+                        this.world,
+                        pos,
+                        state,
+                        modelManager.getBlockStateModelSet().get(state),
+                        state.getSeed(pos)
+                );
             }
-
-            matrices.popPose();
         }
 
+        // GPU uploads have to happen on the render thread
         var future = new CompletableFuture<Void>();
-        RenderSystem.recordRenderCall(() -> {
-            this.bufferStorage.forEach((renderLayer, vertexBuffer) -> vertexBuffer.close());
-            this.bufferStorage.clear();
+        client.execute(() -> {
+            try {
+                this.bufferStorage.values().forEach(UploadedLayer::close);
+                this.bufferStorage.clear();
 
-            builderStorage.forEach((renderLayer, bufferBuilder) -> {
-                var newBuffer = new VertexBuffer(BufferUsage.STATIC_WRITE);
+                var device = RenderSystem.getDevice();
+                builders.forEach((layer, builder) -> {
+                    try (var mesh = builder.build()) {
+                        if (mesh == null) return;
 
-                var built = bufferBuilder.build();
-                if (built == null) return;
+                        if (layer.translucent()) {
+                            var camera = client.gameRenderer.mainCamera().position();
+                            mesh.sortQuads(allocators.get(layer), VertexSorting.byDistance((float) camera.x - from.getX(), (float) camera.y - from.getY(), (float) camera.z - from.getZ()));
+                        }
 
-                if (renderLayer == RenderType.translucent()) {
-                    var camera = client.gameRenderer.getMainCamera();
-                    built.sortQuads(allocatorStorage.buffer(renderLayer), VertexSorting.byDistance((float) camera.getPosition().x - (float) from.getX(), (float) camera.getPosition().y - (float) from.getY(), (float) camera.getPosition().z - (float) from.getZ()));
-                }
+                        var vertices = device.createBuffer(() -> "WorldMesh " + layer.label() + " vertices", GpuBuffer.USAGE_VERTEX, mesh.vertexBuffer());
+                        var indexBuffer = mesh.indexBuffer();
+                        var indices = indexBuffer != null
+                                ? device.createBuffer(() -> "WorldMesh " + layer.label() + " indices", GpuBuffer.USAGE_INDEX, indexBuffer)
+                                : null;
 
-                newBuffer.bind();
-                newBuffer.upload(built);
+                        var drawState = mesh.drawState();
+                        var indexType = indices != null
+                                ? drawState.indexType()
+                                : RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).type();
 
-                var discardedBuffer = this.bufferStorage.put(renderLayer, newBuffer);
-                if (discardedBuffer != null) {
-                    discardedBuffer.close();
-                }
-            });
+                        this.bufferStorage.put(layer, new UploadedLayer(vertices, indices, indexType, drawState.indexCount()));
+                    }
+                });
 
-            future.complete(null);
+                future.complete(null);
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            } finally {
+                allocators.values().forEach(ByteBufferBuilder::close);
+            }
         });
         future.join();
 
@@ -404,16 +411,9 @@ public class WorldMesh {
             );
         }
 
-        allocatorStorage.close();
         this.renderInfo = new DynamicRenderInfo(
                 blockEntities, entities
         );
-    }
-
-    private VertexConsumer getOrCreateBuilder(SectionBufferBuilderPack allocatorStorage, Map<RenderType, BufferBuilder> builderStorage, RenderType layer) {
-        return builderStorage.computeIfAbsent(layer, renderLayer -> {
-            return new BufferBuilder(allocatorStorage.buffer(layer),  VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-        });
     }
 
     public static class Builder {
@@ -447,13 +447,10 @@ public class WorldMesh {
             this.entitySupplier = entitySupplier;
         }
 
-        public Builder(Level world, BlockPos origin, BlockPos end) {
+        public Builder(ClientLevel world, BlockPos origin, BlockPos end) {
             this(world, origin, end, (except, min, max) -> world.getEntities(except, AABB.encapsulatingFullBlocks(min, max), entity -> !(entity instanceof Player)));
         }
 
-        public Builder(BlockAndTintGetter world, BlockPos origin, BlockPos end) {
-            this(world, origin, end, (except) -> List.of());
-        }
 
         public Builder disableCulling() {
             this.cull = false;

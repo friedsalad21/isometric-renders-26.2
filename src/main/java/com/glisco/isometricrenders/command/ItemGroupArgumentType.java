@@ -10,7 +10,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 
@@ -30,7 +30,7 @@ public class ItemGroupArgumentType implements ArgumentType<CreativeModeTab> {
 
     @Override
     public CreativeModeTab parse(StringReader reader) throws CommandSyntaxException {
-        var id = ResourceLocation.read(reader);
+        var id = Identifier.read(reader);
         return CreativeModeTabs.allTabs().stream().filter(itemGroup -> BuiltInRegistries.CREATIVE_MODE_TAB.getKey(itemGroup).equals(id)).findAny().orElseThrow(() -> NO_ITEMGROUP.create(id));
     }
 

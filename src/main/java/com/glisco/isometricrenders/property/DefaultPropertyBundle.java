@@ -6,7 +6,7 @@ import com.glisco.isometricrenders.util.ClientRenderCallback;
 import com.glisco.isometricrenders.util.Translate;
 import com.mojang.math.Axis;
 import io.wispforest.owo.ui.component.ButtonComponent;
-import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
@@ -50,12 +50,12 @@ public class DefaultPropertyBundle implements PropertyBundle {
         IsometricUI.sectionHeader(container, "presets", true);
 
         try (var builder = IsometricUI.row(container)) {
-            builder.row.child(Components.button(Translate.gui("dimetric"), (ButtonComponent button) -> {
+            builder.row.child(UIComponents.button(Translate.gui("dimetric"), (ButtonComponent button) -> {
                 this.rotation.setToDefault();
                 this.slant.set(30);
             }).horizontalSizing(Sizing.fixed(60)).margins(Insets.right(5)));
 
-            builder.row.child(Components.button(Translate.gui("isometric"), (ButtonComponent button) -> {
+            builder.row.child(UIComponents.button(Translate.gui("isometric"), (ButtonComponent button) -> {
                 this.rotation.setToDefault();
                 this.slant.set(36);
             }).horizontalSizing(Sizing.fixed(60)));

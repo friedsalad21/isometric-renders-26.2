@@ -4,7 +4,7 @@ import com.glisco.isometricrenders.property.PropertyBundle;
 import com.glisco.isometricrenders.util.ExportPathSpec;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.wispforest.owo.ui.container.FlowLayout;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
@@ -19,10 +19,7 @@ public class EmptyRenderable implements Renderable<PropertyBundle> {
     };
 
     @Override
-    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {}
-
-    @Override
-    public void draw(Matrix4f modelViewMatrix) {}
+    public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {}
 
     @Override
     public PropertyBundle properties() {

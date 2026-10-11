@@ -10,7 +10,7 @@ import com.glisco.isometricrenders.util.ParticleRestriction;
 import com.glisco.isometricrenders.util.Translate;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.wispforest.owo.ui.component.ButtonComponent;
-import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
@@ -18,7 +18,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
 import java.util.List;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 
 public class BatchRenderable<R extends Renderable<?>> implements Renderable<BatchRenderable.BatchPropertyBundle> {
 
@@ -61,12 +61,12 @@ public class BatchRenderable<R extends Renderable<?>> implements Renderable<Batc
     }
 
     @Override
-    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
-        this.currentDelegate.emitVertices(matrices, vertexConsumers, tickDelta);
+    public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {
+        this.currentDelegate.emitVertices(matrices, collector, tickDelta);
 
         if (this.batchActive && this.currentIndex < this.delegates.size() && System.currentTimeMillis() - this.lastRenderTime > this.renderDelay && ImageIO.taskCount() <= 5) {
-            final var image = RenderableDispatcher.drawIntoImage(this.currentDelegate, 0, GlobalProperties.exportResolution);
-            ImageIO.save(image, this.exportPath());
+            final var path = this.exportPath();
+            RenderableDispatcher.drawIntoImage(this.currentDelegate, 0, GlobalProperties.exportResolution).thenAccept(image -> ImageIO.save(image, path));
 
             this.currentIndex++;
             this.currentDelegate = this.currentIndex < this.delegates.size() ? this.delegates.get(this.currentIndex) : this.currentDelegate;
@@ -153,12 +153,12 @@ public class BatchRenderable<R extends Renderable<?>> implements Renderable<Batc
 
             IsometricUI.sectionHeader(container, "batch.controls", true);
             try (var builder = IsometricUI.row(container)) {
-                final var startButton = Components.button(Translate.gui("batch.start"), (ButtonComponent button) -> {
+                final var startButton = UIComponents.button(Translate.gui("batch.start"), (ButtonComponent button) -> {
                     batchRenderable.start();
                     button.active = false;
                 });
                 builder.row.child(startButton.horizontalSizing(Sizing.fixed(60)).margins(Insets.right(5)));
-                builder.row.child(Components.button(Translate.gui("batch.reset"), (ButtonComponent button) -> {
+                builder.row.child(UIComponents.button(Translate.gui("batch.reset"), (ButtonComponent button) -> {
                     batchRenderable.reset();
                     startButton.active = true;
                 }));

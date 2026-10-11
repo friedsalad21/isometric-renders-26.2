@@ -8,7 +8,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.wispforest.owo.ui.container.FlowLayout;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
@@ -27,7 +27,7 @@ public class TooltipRenderable extends DefaultRenderable<TooltipRenderable.Toolt
         IsometricRenders.centerNextTooltip = true;
 
         var client = Minecraft.getInstance();
-        new GuiGraphics(client, client.renderBuffers().bufferSource())
+        new GuiGraphicsExtractor(client, client.renderBuffers().bufferSource())
                 .renderTooltip(client.font, this.stack, 0, 0);
     }
 

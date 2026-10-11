@@ -10,14 +10,15 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.wispforest.owo.ui.component.ButtonComponent;
-import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.worldmesher.WorldMesh;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -51,7 +52,7 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
     }
 
     @Override
-    public void emitVertices(PoseStack matrices, MultiBufferSource vertexConsumers, float tickDelta) {
+    public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {
         if (!mesh.canRender()) {
             if (mesh.state() == WorldMesh.MeshState.CORRUPT) return;
 
@@ -62,44 +63,47 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
         matrices.setIdentity();
         matrices.translate(-xSize / 2f, -ySize / 2f, -zSize / 2f);
 
-        final var blockEntities = mesh.renderInfo().blockEntities();
-        blockEntities.forEach((blockPos, entity) -> {
+        final var camera = new CameraRenderState();
+        final var blockEntityDispatcher = client.getBlockEntityRenderDispatcher();
+        mesh.renderInfo().blockEntities().forEach((blockPos, entity) -> {
+            final var renderer = blockEntityDispatcher.getRenderer(entity);
+            if (renderer == null) return;
+
+            final var state = renderer.createRenderState();
+            renderer.extractRenderState(entity, state, tickDelta, Vec3.ZERO, null);
+
             matrices.pushPose();
             matrices.translate(blockPos.getX(), blockPos.getY(), blockPos.getZ());
-            client.getBlockEntityRenderDispatcher().render(entity, 0, matrices, vertexConsumers);
+            renderer.submit(state, matrices, collector, camera);
             matrices.popPose();
         });
 
-
-        super.draw(RenderSystem.getModelViewMatrix());
-
         final var effectiveDelta = mesh.entitiesFrozen() ? 0 : client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
-        final var entities = mesh.renderInfo().entities();
-        entities.forEach((vec3d, entry) -> {
+        final var entityDispatcher = client.getEntityRenderDispatcher();
+        mesh.renderInfo().entities().forEach((vec3d, entry) -> {
             if (!mesh.entitiesFrozen()) {
                 vec3d = entry.entity().getPosition(effectiveDelta).subtract(mesh.startPos().getX(), mesh.startPos().getY(), mesh.startPos().getZ());
             }
 
-            client.getEntityRenderDispatcher().render(entry.entity(), vec3d.x, vec3d.y, vec3d.z, effectiveDelta, matrices, vertexConsumers, entry.light());
-            super.draw(RenderSystem.getModelViewMatrix());
+            final var state = entityDispatcher.extractEntity(entry.entity(), effectiveDelta);
+            state.lightCoords = entry.light();
+            state.nameTag = null;
+
+            entityDispatcher.submit(state, camera, vec3d.x, vec3d.y, vec3d.z, matrices, collector);
         });
 
         var diff = Vec3.atLowerCornerOf(mesh.startPos()).subtract(client.player.position());
         matrices.translate(-diff.x, -diff.y + 1.65, -diff.z);
 
-        this.renderParticles(matrices.last().pose(), tickDelta);
+        this.renderParticles(matrices, tickDelta);
     }
 
     @Override
     public void draw(Matrix4f modelViewMatrix) {
         if (!mesh.canRender()) return;
 
+        this.mesh.render(new Matrix4f().translation(-xSize / 2f, -ySize / 2f, -zSize / 2f));
         super.draw(modelViewMatrix);
-
-        final var meshStack = new PoseStack();
-        meshStack.mulPose(modelViewMatrix);
-        meshStack.translate(-xSize / 2f, -ySize / 2f, -zSize / 2f);
-        this.mesh.render(meshStack);
     }
 
     @Override
@@ -160,7 +164,7 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
                 mesh.setFreezeEntities(aBoolean);
             });
 
-            container.child(Components.button(Translate.gui("rebuild_mesh"), (ButtonComponent button) -> mesh.scheduleRebuild())
+            container.child(UIComponents.button(Translate.gui("rebuild_mesh"), (ButtonComponent button) -> mesh.scheduleRebuild())
                     .horizontalSizing(Sizing.fixed(80))
                     .margins(Insets.top(5)));
         }

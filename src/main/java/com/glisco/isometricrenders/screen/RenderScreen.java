@@ -16,8 +16,8 @@ import com.glisco.isometricrenders.widget.NotificationComponent;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import io.wispforest.owo.ui.base.BaseOwoScreen;
-import io.wispforest.owo.ui.component.Components;
-import io.wispforest.owo.ui.container.Containers;
+import io.wispforest.owo.ui.component.UIComponents;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.*;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -36,10 +36,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -86,14 +86,14 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     private int viewportEndX;
     private boolean hasBothColumns = false;
 
-    private final FlowLayout notificationArea = Containers.verticalFlow(Sizing.content(), Sizing.content());
+    private final FlowLayout notificationArea = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
     private final IOStateComponent ioStateComponent = new IOStateComponent();
 
-    private final FlowLayout leftAnchor = Containers.verticalFlow(Sizing.content(), Sizing.content());
-    private final FlowLayout rightAnchor = Containers.verticalFlow(Sizing.content(), Sizing.content());
+    private final FlowLayout leftAnchor = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
+    private final FlowLayout rightAnchor = UIContainers.verticalFlow(Sizing.content(), Sizing.content());
 
-    private final FlowLayout leftColumn = Containers.verticalFlow(Sizing.fill(100), Sizing.content());
-    private final FlowLayout rightColumn = Containers.verticalFlow(Sizing.fill(100), Sizing.content());
+    private final FlowLayout leftColumn = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
+    private final FlowLayout rightColumn = UIContainers.verticalFlow(Sizing.fill(100), Sizing.content());
 
     private final List<RenderTarget> renderedFrames = new ArrayList<>();
     private int remainingAnimationFrames;
@@ -105,7 +105,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
     @Override
     protected @NotNull OwoUIAdapter<FlowLayout> createAdapter() {
-        return OwoUIAdapter.create(this, Containers::horizontalFlow);
+        return OwoUIAdapter.create(this, UIContainers::horizontalFlow);
     }
 
     @Override
@@ -125,9 +125,9 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             this.rightAnchor.positioning(Positioning.absolute(viewportEndX, 0)).horizontalSizing(Sizing.fixed(this.width - this.viewportEndX)).verticalSizing(Sizing.fixed(this.height));
 
             this.rightAnchor.child(
-                Containers.verticalScroll(Sizing.fill(100), Sizing.fill(100), Containers.verticalFlow(Sizing.content(), Sizing.content())
+                UIContainers.verticalScroll(Sizing.fill(100), Sizing.fill(100), UIContainers.verticalFlow(Sizing.content(), Sizing.content())
                     .child(leftColumn)
-                    .child(Components.box(Sizing.fill(85), Sizing.fixed(1)).color(Color.ofDye(DyeColor.GRAY)).fill(true).margins(Insets.top(15)))
+                    .child(UIComponents.box(Sizing.fill(85), Sizing.fixed(1)).color(Color.ofDye(DyeColor.GRAY)).fill(true).margins(Insets.top(15)))
                     .child(rightColumn)
                     .horizontalAlignment(HorizontalAlignment.CENTER))
 
@@ -138,8 +138,8 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             this.leftAnchor.horizontalSizing(Sizing.fixed(viewportBeginX)).verticalSizing(Sizing.fixed(this.height));
             this.rightAnchor.positioning(Positioning.absolute(viewportEndX, 0)).horizontalSizing(Sizing.fixed(viewportBeginX)).verticalSizing(Sizing.fixed(this.height));
 
-            this.leftAnchor.child(Containers.verticalScroll(Sizing.fill(100), Sizing.fill(100), this.leftColumn));
-            this.rightAnchor.child(Containers.verticalScroll(Sizing.fill(100), Sizing.fill(100), this.rightColumn));
+            this.leftAnchor.child(UIContainers.verticalScroll(Sizing.fill(100), Sizing.fill(100), this.leftColumn));
+            this.rightAnchor.child(UIContainers.verticalScroll(Sizing.fill(100), Sizing.fill(100), this.rightColumn));
         }
 
         this.notificationArea.positioning(Positioning.absolute(this.viewportBeginX + 5, 5)).sizing(Sizing.fixed(this.height - 10));
@@ -191,16 +191,16 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
         final Button exportButton;
         try (var builder = IsometricUI.row(rightColumn)) {
-            exportButton = Components.button(Translate.gui("export"), button -> this.captureScheduled = true);
+            exportButton = UIComponents.button(Translate.gui("export"), button -> this.captureScheduled = true);
             builder.row.child(exportButton.horizontalSizing(Sizing.fixed(75)));
 
-            builder.row.child(Components.button(Translate.gui("open_folder"), button -> {
+            builder.row.child(UIComponents.button(Translate.gui("open_folder"), button -> {
                 Util.getPlatform().openFile(this.renderable.exportPath().resolveOffset().toFile());
             }).horizontalSizing(Sizing.fixed(75)).margins(Insets.left(5)));
         }
 
         if (!GraphicsEnvironment.isHeadless()) {
-            rightColumn.child(Components.button(Translate.gui("export_to_clipboard"), button -> {
+            rightColumn.child(UIComponents.button(Translate.gui("export_to_clipboard"), button -> {
 
                 this.notify(Translate.gui("copied_to_clipboard"));
 
@@ -260,7 +260,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                 });
 
                 try (var builder = IsometricUI.row(rightColumn)) {
-                    this.exportAnimationButton = Components.button(Translate.gui("export_animation"), button -> {
+                    this.exportAnimationButton = UIComponents.button(Translate.gui("export_animation"), button -> {
                         if (this.memoryGuard.canFit(this.estimateMemoryUsage(exportFrames)) || Screen.hasShiftDown()) {
                             this.remainingAnimationFrames = exportFrames;
 
@@ -273,7 +273,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
                     });
                     builder.row.child(this.exportAnimationButton.horizontalSizing(Sizing.fixed(100)).margins(Insets.right(5)));
 
-                    builder.row.child(Components.button(Translate.gui("format." + animationFormat.extension), button -> {
+                    builder.row.child(UIComponents.button(Translate.gui("format." + animationFormat.extension), button -> {
                         animationFormat = animationFormat.next();
                         button.setMessage(Translate.gui("format." + animationFormat.extension));
                     }).horizontalSizing(Sizing.fixed(35)));
@@ -309,7 +309,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 
         if (this.guiRebuildScheduled) {
             this.guiRebuildScheduled = false;
@@ -556,14 +556,14 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
         this.minecraft.getFramerateLimitTracker().setFramerateLimit(this.minecraft.options.framerateLimit().get());
     }
 
-    private void drawFramingHint(GuiGraphics context) {
+    private void drawFramingHint(GuiGraphicsExtractor context) {
         context.fill(viewportBeginX + 5, 0, viewportEndX - 5, 5, 0x90000000);
         context.fill(viewportBeginX + 5, height - 5, viewportEndX - 5, height, 0x90000000);
         context.fill(viewportBeginX, 0, viewportBeginX + 5, height, 0x90000000);
         context.fill(viewportEndX - 5, 0, viewportEndX, height, 0x90000000);
     }
 
-    private void drawGuiBackground(GuiGraphics context) {
+    private void drawGuiBackground(GuiGraphicsExtractor context) {
         context.fill(0, 0, viewportBeginX, height, 0x90000000);
         context.fill(viewportEndX, 0, width, height, 0x90000000);
     }

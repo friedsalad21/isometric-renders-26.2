@@ -7,15 +7,15 @@ import com.glisco.isometricrenders.widget.DynamicLabelComponent;
 import com.glisco.isometricrenders.widget.PropertyCheckboxComponent;
 import com.glisco.isometricrenders.widget.PropertySliderComponent;
 import com.glisco.isometricrenders.widget.PropertyTextFieldComponent;
-import io.wispforest.owo.ui.component.Components;
+import io.wispforest.owo.ui.component.UIComponents;
 import io.wispforest.owo.ui.component.LabelComponent;
-import io.wispforest.owo.ui.container.Containers;
+import io.wispforest.owo.ui.container.UIContainers;
 import io.wispforest.owo.ui.container.FlowLayout;
 import io.wispforest.owo.ui.core.Insets;
 import io.wispforest.owo.ui.core.Sizing;
 import io.wispforest.owo.ui.core.VerticalAlignment;
 import java.util.function.Supplier;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
@@ -23,17 +23,17 @@ public class IsometricUI {
 
     public static EditBox labelledTextField(FlowLayout container, String content, String key, Sizing sizing) {
         try (var builder = row(container)) {
-            final var textBox = Components.textBox(sizing, content);
+            final var textBox = UIComponents.textBox(sizing, content);
 
             builder.row.child(textBox);
-            builder.row.child(Components.label(Translate.gui(key)).margins(Insets.left(8)));
+            builder.row.child(UIComponents.label(Translate.gui(key)).margins(Insets.left(8)));
 
             return textBox;
         }
     }
 
     public static LabelComponent sectionHeader(FlowLayout container, String key, boolean separate) {
-        final var label = Components.label(Translate.gui(key)).shadow(true);
+        final var label = UIComponents.label(Translate.gui(key)).shadow(true);
         if (separate) label.margins(Insets.top(20));
         label.margins(label.margins().get().withBottom(5));
 
@@ -60,7 +60,7 @@ public class IsometricUI {
         }
     }
 
-    public static void drawExportProgressBar(GuiGraphics context, int x, int y, int drawWidth, int barWidth, double speed) {
+    public static void drawExportProgressBar(GuiGraphicsExtractor context, int x, int y, int drawWidth, int barWidth, double speed) {
         int end = x + drawWidth + barWidth;
 
         int offset = (int) (System.currentTimeMillis() / speed % (drawWidth + barWidth));
@@ -72,7 +72,7 @@ public class IsometricUI {
     }
 
     public static RowBuilder row(FlowLayout container) {
-        var component = Containers.horizontalFlow(Sizing.fill(100), Sizing.content());
+        var component = UIContainers.horizontalFlow(Sizing.fill(100), Sizing.content());
         component.margins(Insets.vertical(5)).verticalAlignment(VerticalAlignment.CENTER);
         return new RowBuilder(component, container);
     }
