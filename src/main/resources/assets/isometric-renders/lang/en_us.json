@@ -73,6 +73,8 @@
   "gui.isometric-renders.background_color": "Background Color",
   "gui.isometric-renders.export_options": "Export Options",
   "gui.isometric-renders.renderer_resolution": "Export Resolution",
+  "gui.isometric-renders.supersampling": "Anti-aliasing: %s",
+  "gui.isometric-renders.supersampling.off": "Off",
   "gui.isometric-renders.hotkeys": "F10: Toggle UI  F12: Export",
 
   "gui.isometric-renders.memory_warning1": "Warning: Unless you have at least 6GB ",

@@ -201,6 +201,11 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             }).horizontalSizing(Sizing.fixed(75)).margins(Insets.left(5)));
         }
 
+        rightColumn.child(UIComponents.button(supersamplingLabel(), button -> {
+            supersampling = supersampling == 1 ? 2 : supersampling == 2 ? 4 : 1;
+            button.setMessage(supersamplingLabel());
+        }).horizontalSizing(Sizing.fixed(155)).margins(Insets.bottom(5)));
+
         if (!GraphicsEnvironment.isHeadless()) {
             rightColumn.child(UIComponents.button(Translate.gui("export_to_clipboard"), button -> {
 
@@ -530,6 +535,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             KEYBOARD_CONTROLS.get(keyCode).accept((DefaultPropertyBundle) this.renderable.properties());
         }
         return true;
+    }
+
+    private static Component supersamplingLabel() {
+        return Translate.gui("supersampling", supersampling == 1 ? Translate.gui("supersampling.off") : Component.literal(supersampling + "x"));
     }
 
     private int estimateMemoryUsage(int frames) {

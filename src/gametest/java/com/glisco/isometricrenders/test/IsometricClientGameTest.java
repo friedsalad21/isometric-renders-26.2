@@ -62,9 +62,13 @@ public class IsometricClientGameTest implements FabricClientGameTest {
                 return screen;
             });
             context.waitTicks(40);
-            context.runOnClient(client -> ((RenderScreen) client.gui.screen()).scheduleCapture());
+            context.runOnClient(client -> {
+                com.glisco.isometricrenders.property.GlobalProperties.exportResolution = 4096;
+                ((RenderScreen) client.gui.screen()).scheduleCapture();
+            });
             context.waitFor(client -> glassExport.get() != null, 200);
             System.out.println("[isometric-gametest] exported " + glassExport.get().getAbsolutePath());
+            context.runOnClient(client -> com.glisco.isometricrenders.property.GlobalProperties.exportResolution = 1000);
 
             shot(context, "atlas", () -> new ItemAtlasRenderable("test", java.util.List.of(new ItemStack(Items.APPLE), new ItemStack(Items.STONE), new ItemStack(Items.BOW), new ItemStack(Items.CHEST), new ItemStack(Items.SHIELD))));
 

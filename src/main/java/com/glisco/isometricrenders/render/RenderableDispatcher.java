@@ -1,6 +1,7 @@
 package com.glisco.isometricrenders.render;
 
 import com.glisco.isometricrenders.IsometricRenders;
+import com.glisco.isometricrenders.property.GlobalProperties;
 import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -24,6 +25,8 @@ import java.util.function.Consumer;
 public class RenderableDispatcher {
 
     private static final Vector4f CLEAR_COLOR = new Vector4f(0, 0, 0, 0);
+    // 8192x8192 color + depth is already ~512MB of VRAM, supersampling backs off beyond that
+    private static final int MAX_SUPERSAMPLED_SIZE = 8192;
     // One buffer per nesting level, batch renders draw into images while the preview is drawing
     private static final List<ProjectionMatrixBuffer> PROJECTION_BUFFERS = new ArrayList<>();
     private static int nesting = 0;
@@ -111,8 +114,14 @@ public class RenderableDispatcher {
     public static CompletableFuture<NativeImage> drawIntoImage(Renderable<?> renderable, float tickDelta, int size) {
         final var device = RenderSystem.getDevice();
 
-        final var color = device.createTexture(() -> "isometric-renders color", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, GpuFormat.RGBA8_UNORM, size, size, 1, 1);
-        final var depth = device.createTexture(() -> "isometric-renders depth", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_RENDER_ATTACHMENT, GpuFormat.D32_FLOAT, size, size, 1, 1);
+        // Supersampling: render larger and box-filter down for smooth edges
+        int samples = GlobalProperties.supersampling;
+        while (samples > 1 && size * samples > MAX_SUPERSAMPLED_SIZE) samples--;
+        final int factor = samples;
+        final int renderSize = size * factor;
+
+        final var color = device.createTexture(() -> "isometric-renders color", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_RENDER_ATTACHMENT, GpuFormat.RGBA8_UNORM, renderSize, renderSize, 1, 1);
+        final var depth = device.createTexture(() -> "isometric-renders depth", GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_RENDER_ATTACHMENT, GpuFormat.D32_FLOAT, renderSize, renderSize, 1, 1);
         final var colorView = device.createTextureView(color);
         final var depthView = device.createTextureView(depth);
 
@@ -121,14 +130,30 @@ public class RenderableDispatcher {
 
         final var future = new CompletableFuture<NativeImage>();
         final int blockSize = color.getFormat().blockSize();
-        final var buffer = device.createBuffer(() -> "isometric-renders readback", GpuBuffer.USAGE_MAP_READ | GpuBuffer.USAGE_COPY_DST, (long) size * size * blockSize);
+        final var buffer = device.createBuffer(() -> "isometric-renders readback", GpuBuffer.USAGE_MAP_READ | GpuBuffer.USAGE_COPY_DST, (long) renderSize * renderSize * blockSize);
 
         device.createCommandEncoder().copyTextureToBuffer(color, buffer, 0, () -> {
             try (var read = buffer.map(true, false)) {
+                final var data = read.data();
                 final var image = new NativeImage(size, size, false);
+                final int sampleCount = factor * factor;
+
                 for (int y = 0; y < size; y++) {
                     for (int x = 0; x < size; x++) {
-                        image.setPixelABGR(x, size - y - 1, unpremultiply(read.data().getInt((x + y * size) * blockSize)));
+                        // Average premultiplied values, then convert to straight alpha
+                        int c0 = 0, c1 = 0, c2 = 0, a = 0;
+                        for (int sy = 0; sy < factor; sy++) {
+                            for (int sx = 0; sx < factor; sx++) {
+                                final int pixel = data.getInt(((x * factor + sx) + (y * factor + sy) * renderSize) * blockSize);
+                                c0 += pixel & 0xFF;
+                                c1 += pixel >> 8 & 0xFF;
+                                c2 += pixel >> 16 & 0xFF;
+                                a += pixel >>> 24;
+                            }
+                        }
+
+                        final int averaged = (a / sampleCount) << 24 | (c2 / sampleCount) << 16 | (c1 / sampleCount) << 8 | (c0 / sampleCount);
+                        image.setPixelABGR(x, size - y - 1, unpremultiply(averaged));
                     }
                 }
                 future.complete(image);
