@@ -1,4 +1,5 @@
 {
+  "owo:rich_translations": true,
   "key.isometric-renders.area_select": [
     "",
     {"text": "[", "color": "dark_gray"},

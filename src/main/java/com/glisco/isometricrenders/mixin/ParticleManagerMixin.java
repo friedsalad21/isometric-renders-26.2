@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ParticleEngine.class)
 public class ParticleManagerMixin {
 
-    @Inject(method = "addParticle(Lnet/minecraft/client/particle/Particle;)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "add", at = @At("HEAD"), cancellable = true)
     public void stopParticles(Particle particle, CallbackInfo ci) {
         if (!(Minecraft.getInstance().gui.screen() instanceof RenderScreen screen)) return;
         if (!screen.tickParticles.get()) {

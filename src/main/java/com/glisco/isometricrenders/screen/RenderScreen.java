@@ -225,7 +225,7 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
 
         var resolutionField = IsometricUI.labelledTextField(rightColumn, String.valueOf(exportResolution), "renderer_resolution", Sizing.fixed(50));
 
-        resolutionField.setTextColor(0x00FF00);
+        resolutionField.setTextColor(0xFF00FF00);
         resolutionField.setFilter(s -> s.matches("\\d{0,5}"));
         resolutionField.setResponder(s -> {
             if (s.isBlank()) return;
@@ -236,10 +236,10 @@ public class RenderScreen extends BaseOwoScreen<FlowLayout> {
             // what?
 
             if ((resolution < 16 || resolution > 16384) && !unsafe.get()) {
-                resolutionField.setTextColor(0xFF0000);
+                resolutionField.setTextColor(0xFFFF0000);
                 exportButton.active = false;
             } else {
-                resolutionField.setTextColor(0x00FF00);
+                resolutionField.setTextColor(0xFF00FF00);
                 exportResolution = resolution;
                 exportButton.active = true;
             }

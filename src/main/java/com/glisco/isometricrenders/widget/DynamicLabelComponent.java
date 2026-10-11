@@ -13,7 +13,7 @@ public class DynamicLabelComponent extends BaseUIComponent {
     private final Font textRenderer = Minecraft.getInstance().font;
 
     private final Supplier<Component> content;
-    private int color = 0xFFFFFF;
+    private int color = 0xFFFFFFFF;
     private boolean shadow = true;
 
     public DynamicLabelComponent(Supplier<Component> content) {

@@ -18,10 +18,12 @@ public class PropertyTextFieldComponent extends TextBoxComponent {
         this.setting = setting;
 
         this.setValue(String.valueOf(setting.get()));
+        this.moveCursorToStart(false);
         this.setFilter(makeMatcher());
 
         this.setting.listen((integerSetting, integer) -> {
             this.setValue(String.valueOf(integer));
+            this.moveCursorToStart(false);
         });
 
         this.setResponder(s -> {

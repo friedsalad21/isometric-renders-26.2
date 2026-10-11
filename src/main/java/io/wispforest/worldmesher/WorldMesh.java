@@ -307,6 +307,7 @@ public class WorldMesh {
                             entity = entity.getType().create(client.level, EntitySpawnReason.LOAD);
 
                             entity.restoreFrom(originalEntity);
+                            entity.setId(originalEntity.getId());
                             entity.copyPosition(originalEntity);
                             entity.tick();
                         }

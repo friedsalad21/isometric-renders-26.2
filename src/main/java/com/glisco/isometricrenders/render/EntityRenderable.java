@@ -35,8 +35,12 @@ public class EntityRenderable extends DefaultRenderable<DefaultPropertyBundle> i
     private final Minecraft client = Minecraft.getInstance();
     private final Entity entity;
 
+    // Entities that never joined a level have no ID, which 26.x render state extraction requires
+    private static int nextRenderId = -1000;
+
     public EntityRenderable(Entity entity) {
         this.entity = entity;
+        applyToEntityAndPassengers(entity, e -> e.setId(nextRenderId--));
     }
 
     public static EntityRenderable of(EntityType<?> type, @Nullable CompoundTag nbt) {

@@ -48,3 +48,13 @@ jar {
         rename { "${it}_${project.base.archivesName.get()}"}
     }
 }
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "isometric-renders-gametest"
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+    }
+}
