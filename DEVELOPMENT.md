@@ -68,5 +68,5 @@ prefixing `LIBGL_ALWAYS_SOFTWARE=1`.
 
 ## Releasing
 
-Bump `mod_version` in `gradle.properties`, build, and attach `build/libs/isometric-renders-<version>.jar` to a new
+Bump `mod_version` in `gradle.properties`, build, and attach `build/libs/IsometricRenders-<version>.jar` to a new
 GitHub release. Older releases stay up so any version can still be downloaded.

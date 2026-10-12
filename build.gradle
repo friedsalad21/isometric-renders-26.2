@@ -52,6 +52,8 @@ java {
 }
 
 jar {
+    // Short download name: IsometricRenders-<version>.jar (this repo only targets 26.2)
+    archiveFileName = "IsometricRenders-${project.mod_version.tokenize('+')[0]}.jar"
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}"}
     }
