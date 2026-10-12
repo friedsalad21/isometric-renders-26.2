@@ -14,6 +14,7 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
 - Area meshes re-sort translucent quads for the render's view direction, not the player camera.
 - Export anti-aliasing: supersampling Off/2x/4x (default 2x), backs off above an 8192 render size.
 - `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`.
+- `-PwithLitematica` adds Litematica + malilib to dev and test runs (for building test scenes from schematics).
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,
 the `/isorender` commands typed in-game.

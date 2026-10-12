@@ -12,6 +12,10 @@ base {
 repositories {
     maven { url "https://maven.wispforest.io/releases/" }
     maven { url "https://jitpack.io" }
+    exclusiveContent {
+        forRepository { maven { url "https://api.modrinth.com/maven" } }
+        filter { includeGroup "maven.modrinth" }
+    }
 }
 
 loom {
@@ -29,6 +33,12 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     implementation "io.wispforest:owo-lib:${project.owo_version}"
     include "io.wispforest:owo-sentinel:${project.owo_version}"
+
+    // Litematica (+ malilib) in dev runs with -PwithLitematica, for pasting test builds from schematics
+    if (project.hasProperty("withLitematica")) {
+        localRuntime "maven.modrinth:litematica:${project.litematica_version}"
+        localRuntime "maven.modrinth:malilib:${project.malilib_version}"
+    }
 }
 
 processResources {
