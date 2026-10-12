@@ -20,6 +20,11 @@ repositories {
 
 loom {
     accessWidenerPath = file("src/main/resources/isometricrenders.accesswidener")
+
+    // Dev and test runs: enough memory for big area renders and shader packs
+    runs.configureEach {
+        vmArg "-Xmx8G"
+    }
 }
 
 dependencies {
@@ -38,6 +43,12 @@ dependencies {
     if (project.hasProperty("withShaders")) {
         localRuntime "maven.modrinth:iris:${project.iris_version}"
         localRuntime "maven.modrinth:sodium:${project.sodium_version}"
+    }
+
+    // Litematica (+ malilib) in dev runs with -PwithLitematica, for pasting test builds from schematics
+    if (project.hasProperty("withLitematica")) {
+        localRuntime "maven.modrinth:litematica:${project.litematica_version}"
+        localRuntime "maven.modrinth:malilib:${project.malilib_version}"
     }
 }
 

@@ -29,6 +29,7 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   directional shading). Photon doesn't load on software GL. `compat/IrisCompat` turns off Iris' vertex format
   extension while area meshes build: Iris decides that from a global "extracting a frame" flag, so a background mesh
   build could otherwise get Iris' wider vertex format that vanilla's pipelines can't read.
+- `-PwithLitematica` adds Litematica + malilib to dev and test runs (for building test scenes from schematics).
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,
 the `/isorender` commands typed in-game.
