@@ -24,7 +24,7 @@ public class IsometricClientGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        try (var world = context.worldBuilder().create()) {
+        try (var world = TestWorlds.emptyCreative(context)) {
             context.waitTicks(40);
 
             final BlockPos origin = context.computeOnClient(client -> client.player.blockPosition()).offset(3, 0, 0);
@@ -56,6 +56,29 @@ public class IsometricClientGameTest implements FabricClientGameTest {
             final double cx = origin.getX() + 2.5, cy = origin.getY() + 2, cz = origin.getZ() + 2.5;
             server.runCommand("script run draw_shape('sphere', 2400, 'center', [" + cx + ", " + cy + ", " + cz + "], 'radius', 1.5, 'color', 0xFF00FFFF, 'line', 3)");
             server.runCommand("script run draw_shape('box', 2400, 'from', [" + origin.getX() + ", " + (origin.getY() + 1) + ", " + origin.getZ() + "], 'to', [" + (origin.getX() + 2) + ", " + (origin.getY() + 3) + ", " + (origin.getZ() + 2) + "], 'color', 0x00FFFFFF, 'fill', 0x00FFFF40)");
+            if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("gizmolib")) {
+                // gizmolib draws its own shapes, ghost blocks and text instead of Carpet's
+                final String c = "[" + cx + ", " + cy + ", " + cz + "]";
+                final String corner = "[" + (origin.getX() + 3) + ", " + (origin.getY() + 1) + ", " + (origin.getZ() + 3) + "]";
+                server.runCommand("execute as @p at @s run script run gizmo_shape('iso_sphere', {'shape' -> 'sphere', 'pos' -> " + c + ", 'radius' -> 2, 'color' -> 0xff3333, 'width' -> 3})");
+                server.runCommand("execute as @p at @s run script run gizmo_shape('iso_box', {'shape' -> 'box', 'pos' -> [" + origin.getX() + ", " + (origin.getY() + 1) + ", " + (origin.getZ() + 3) + "], 'size' -> [1, 1, 1], 'color' -> 0x00ff88, 'fill' -> 0x6000ff88, 'width' -> 3})");
+                server.runCommand("execute as @p at @s run script run gizmo_shape('iso_arrow', {'shape' -> 'arrow', 'pos' -> [" + (origin.getX() + 0.5) + ", " + (origin.getY() + 3.5) + ", " + (origin.getZ() + 0.5) + "], 'to' -> [" + (origin.getX() + 4.5) + ", " + (origin.getY() + 3.5) + ", " + (origin.getZ() + 4.5) + "], 'color' -> 0xffcc00, 'width' -> 4})");
+                server.runCommand("execute as @p at @s run script run gizmo_blocks('iso_ghost', [[" + (origin.getX() + 4) + ", " + (origin.getY() + 1) + ", " + origin.getZ() + "]], 'gold_block', 128)");
+                server.runCommand("execute as @p at @s run script run gizmo_text('iso_text', {'pos' -> [" + (origin.getX() + 2.5) + ", " + (origin.getY() + 3.2) + ", " + (origin.getZ() + 0.5) + "], 'text' -> 'gizmo label', 'scale' -> 1, 'through' -> true})");
+                context.setScreen(() -> null);
+                server.runCommand("setblock " + (origin.getX() - 3) + " " + (origin.getY() + 3) + " " + (origin.getZ() - 3) + " minecraft:barrier");
+                server.runCommand("tp @p " + (origin.getX() - 2.5) + " " + (origin.getY() + 4) + " " + (origin.getZ() - 2.5) + " facing " + cx + " " + cy + " " + cz);
+                context.waitTicks(20);
+                System.out.println("[isometric-gametest] screenshot " + context.takeScreenshot("world_gizmolib"));
+                context.runOnClient(client -> {
+                    try {
+                        System.out.println("[isometric-gametest] gizmolib shapes: " + Class.forName("com.gizmolib.client.ShapeStore").getMethod("count").invoke(null)
+                                + ", ghost blocks empty: " + Class.forName("com.gizmolib.client.GhostBlocks").getMethod("isEmpty").invoke(null));
+                    } catch (ReflectiveOperationException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                });
+            }
             context.waitTicks(10);
             shot(context, "area_debug", () -> AreaRenderable.of(origin, origin.offset(4, 3, 4)));
 
@@ -98,6 +121,9 @@ public class IsometricClientGameTest implements FabricClientGameTest {
                 client.debugEntries.setStatus(DebugScreenEntries.CHUNK_BORDERS, DebugScreenEntryStatus.NEVER);
             });
             server.runCommand("script run clear_shapes()");
+            if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("gizmolib")) {
+                for (var group : new String[]{"iso_sphere", "iso_box", "iso_arrow", "iso_ghost", "iso_text"}) server.runCommand("execute as @p at @s run script run gizmo_clear('" + group + "')");
+            }
             // Layers of stacked translucent blocks to check sorting
             final var glass = origin.offset(0, 0, 8);
             server.runCommand("fill " + glass.getX() + " " + glass.getY() + " " + glass.getZ() + " " + (glass.getX() + 6) + " " + (glass.getY() + 3) + " " + (glass.getZ() + 3) + " minecraft:air");
