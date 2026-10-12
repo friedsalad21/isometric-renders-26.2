@@ -97,7 +97,8 @@ public class SeedAreaClientGameTest implements FabricClientGameTest {
         context.waitTicks(1);
         System.out.println("[isometric-seed] screenshot " + context.takeScreenshot("seed_render_" + name + "_first"));
 
-        for (int i = 1; i <= 3; i++) {
+        final int rebuilds = Integer.parseInt(System.getenv().getOrDefault("ISO_REBUILDS", "3"));
+        for (int i = 1; i <= rebuilds; i++) {
             context.runOnClient(client -> renderable.get().mesh().scheduleRebuild());
             // The old mesh keeps drawing while the new one builds, then the new one is swapped in
             context.waitTicks(1);
@@ -106,6 +107,17 @@ public class SeedAreaClientGameTest implements FabricClientGameTest {
             context.waitTicks(1);
             System.out.println("[isometric-seed] screenshot " + context.takeScreenshot("seed_render_" + name + "_rebuild" + i));
         }
+
+        // Like a player spamming the rebuild button: a rebuild request every tick, screenshots in between
+        final int spamTicks = Integer.parseInt(System.getenv().getOrDefault("ISO_SPAM_TICKS", "0"));
+        for (int tick = 1; tick <= spamTicks; tick++) {
+            context.runOnClient(client -> renderable.get().mesh().scheduleRebuild());
+            context.waitTick();
+            if (tick % 4 == 0) {
+                System.out.println("[isometric-seed] screenshot " + context.takeScreenshot("seed_render_" + name + "_spam" + tick));
+            }
+        }
+        if (spamTicks > 0) context.waitFor(client -> renderable.get().mesh().state() == WorldMesh.MeshState.READY, 2400);
 
         context.runOnClient(client -> ((RenderScreen) client.gui.screen()).scheduleCapture());
         context.waitFor(client -> export.get() != null, 1200);
