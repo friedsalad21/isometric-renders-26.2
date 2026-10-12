@@ -128,11 +128,17 @@ public class WorldMesh {
             if (layer.translucent()) this.resortIfNeeded(modelView, uploaded);
             renderStartAction.run();
 
-            final var indices = uploaded.indices != null
-                    ? uploaded.indices
-                    : RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).getBuffer(uploaded.indexCount);
+            // The shared sequential buffer switches to int indices when it grows past 65k vertices,
+            // so its type has to be read after getBuffer, not cached at upload
+            var indices = uploaded.indices;
+            var indexType = uploaded.indexType;
+            if (indices == null) {
+                final var sequential = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
+                indices = sequential.getBuffer(uploaded.indexCount);
+                indexType = sequential.type();
+            }
 
-            renderTypeFor(layer).prepare().drawFromBuffer(uploaded.vertices, indices, uploaded.indexType, 0, 0, uploaded.indexCount);
+            renderTypeFor(layer).prepare().drawFromBuffer(uploaded.vertices, indices, indexType, 0, 0, uploaded.indexCount);
 
             renderEndAction.run();
         });
@@ -422,11 +428,7 @@ public class WorldMesh {
                                 : null;
 
                         var drawState = mesh.drawState();
-                        var indexType = indices != null
-                                ? drawState.indexType()
-                                : RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).type();
-
-                        this.bufferStorage.put(layer, new UploadedLayer(vertices, indices, indexType, drawState.indexCount()));
+                        this.bufferStorage.put(layer, new UploadedLayer(vertices, indices, drawState.indexType(), drawState.indexCount()));
                     }
                 });
 
