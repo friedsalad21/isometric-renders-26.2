@@ -12,6 +12,17 @@ final class TestWorlds {
     private TestWorlds() {}
 
     /**
+     * The owner's own settings (90 FOV, GUI scale 2), so screenshots look like what players see
+     */
+    static void playerOptions(ClientGameTestContext context) {
+        context.runOnClient(client -> {
+            client.options.fov().set(90);
+            client.options.guiScale().set(2);
+            client.resizeGui();
+        });
+    }
+
+    /**
      * A creative void world with nothing in it but a barrier block
      * under the player, so test builds have no terrain around them
      */

@@ -56,6 +56,10 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
         return new AreaRenderable(builder.build());
     }
 
+    public WorldMesh mesh() {
+        return this.mesh;
+    }
+
     @Override
     public void emitVertices(PoseStack matrices, SubmitNodeCollector collector, float tickDelta) {
         if (!mesh.canRender()) {

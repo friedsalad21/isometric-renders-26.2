@@ -34,9 +34,11 @@ public class ShaderPackClientGameTest implements FabricClientGameTest {
         final var source = System.getenv("ISO_SHADERPACKS");
         final var iris = FabricLoader.getInstance().isModLoaded("iris");
         if ((!iris || source == null) && System.getenv("ISO_BUILDS") == null) return;
+        if (System.getenv("ISO_SEED") != null) return;
 
         final List<String> packs = iris && source != null ? copyPacks(source) : List.of();
 
+        TestWorlds.playerOptions(context);
         try (var world = TestWorlds.emptyCreative(context)) {
             context.runOnClient(client -> client.options.renderDistance().set(6));
             context.waitTicks(40);
@@ -71,7 +73,7 @@ public class ShaderPackClientGameTest implements FabricClientGameTest {
         }
     }
 
-    private static List<String> copyPacks(String source) {
+    static List<String> copyPacks(String source) {
         try (var files = Files.list(Path.of(source))) {
             final var filter = System.getenv().getOrDefault("ISO_SHADER_FILTER", "").toLowerCase(Locale.ROOT);
             return files.filter(path -> path.toString().endsWith(".zip"))
@@ -172,7 +174,7 @@ public class ShaderPackClientGameTest implements FabricClientGameTest {
         System.out.println("[isometric-shaders] exported " + name + " " + export.get().getAbsolutePath());
     }
 
-    private static void loadPack(String pack) {
+    static void loadPack(String pack) {
         try {
             Iris.getIrisConfig().setShaderPackName(pack);
             Iris.getIrisConfig().setShadersEnabled(true);

@@ -39,6 +39,9 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   instead of the lowest, `ISO_BUILDS=<dir with .litematic files>` also pastes and renders those builds (works without
   `-PwithShaders` too), and `ISO_ONLY_SHADERS=1` skips the main gametest. `Litematic` pastes schematics without block
   updates, so redstone stays as saved.
+- Generated-world areas: `ISO_SEED=<seed> ISO_AREA="x1 y1 z1 x2 y2 z2"` makes `SeedAreaClientGameTest` render that area of a
+  fresh world (plain, then with the `ISO_SHADERPACKS` packs), rebuilding the mesh 3 times per render. World gen is slow on
+  a weak CPU, so give it ~10 minutes. Tests use 90 FOV and GUI scale 2 so screenshots look like a normal game.
 - `-PwithLitematica` adds Litematica + malilib to dev and test runs (for building test scenes from schematics).
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,

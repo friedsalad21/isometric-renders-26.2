@@ -27,6 +27,7 @@ public class IsometricClientGameTest implements FabricClientGameTest {
         // Lets a shader pack run skip straight to the packs
         if (System.getenv("ISO_ONLY_SHADERS") != null) return;
 
+        TestWorlds.playerOptions(context);
         try (var world = TestWorlds.emptyCreative(context)) {
             context.waitTicks(40);
 
