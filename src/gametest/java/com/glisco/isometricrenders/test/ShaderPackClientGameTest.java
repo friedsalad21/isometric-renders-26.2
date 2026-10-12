@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.loader.api.FabricLoader;
 import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.vertices.ImmediateState;
 import net.irisshaders.iris.shaderpack.option.Profile;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
@@ -162,8 +163,10 @@ public class ShaderPackClientGameTest implements FabricClientGameTest {
         System.out.println("[isometric-shaders] screenshot " + context.takeScreenshot("shaders_world_" + name));
 
         final var export = new AtomicReference<File>();
+        final var renderable = new AtomicReference<AreaRenderable>();
         context.setScreen(() -> {
-            var screen = new RenderScreen(AreaRenderable.of(scene.min(), scene.max()));
+            renderable.set(AreaRenderable.of(scene.min(), scene.max()));
+            var screen = new RenderScreen(renderable.get());
             screen.setExportCallback(export::set);
             return screen;
         });
@@ -172,6 +175,21 @@ public class ShaderPackClientGameTest implements FabricClientGameTest {
         context.runOnClient(client -> ((RenderScreen) client.gui.screen()).scheduleCapture());
         context.waitFor(client -> export.get() != null, 600);
         System.out.println("[isometric-shaders] exported " + name + " " + export.get().getAbsolutePath());
+
+        // Rebuild while Iris thinks the world is being drawn, which used to hand the mesh Iris' vertex format.
+        // Building on the render thread makes that timing certain instead of a race
+        if (FabricLoader.getInstance().isModLoaded("iris") && Iris.isPackInUseQuick()) {
+            context.runOnClient(client -> {
+                ImmediateState.isRenderingLevel = true;
+                try {
+                    renderable.get().mesh().scheduleRebuild(Runnable::run);
+                } finally {
+                    ImmediateState.isRenderingLevel = false;
+                }
+            });
+            context.waitTicks(5);
+            System.out.println("[isometric-shaders] screenshot " + context.takeScreenshot("shaders_render_" + name + "_forced_rebuild"));
+        }
     }
 
     static void loadPack(String pack) {
