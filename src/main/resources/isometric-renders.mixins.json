@@ -5,8 +5,10 @@
   "compatibilityLevel": "JAVA_25",
   "plugin": "com.glisco.isometricrenders.mixin.IsometricMixinPlugin",
   "client": [
+    "GizmoFeatureRendererMixin",
     "GuiMixin",
     "HandledScreenMixin",
+    "LevelExtractorMixin",
     "MinecraftClientMixin",
     "ParticleManagerMixin",
     "SliderWidgetInvoker",
@@ -15,6 +17,7 @@
     "access.BlockEntityAccessor",
     "access.BlockStateArgumentAccessor",
     "access.CameraInvoker",
+    "access.EntityHitboxDebugRendererInvoker",
     "access.ItemRenderStateAccessor",
     "access.LayerRenderStateAccessor"
   ],

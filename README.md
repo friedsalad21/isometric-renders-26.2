@@ -7,7 +7,8 @@
 > To update, replace the old jar with the new one. Older versions stay available on the Releases page.
 >
 > Port-only additions: export anti-aliasing (supersampling Off/2x/4x), correct colors for translucent blocks in exports,
-> view-based translucent sorting in area renders, and a client gametest (`./gradlew runClientGameTest`).
+> view-based translucent sorting in area renders, debug overlays in area renders (F3 hitboxes, chunk borders and other
+> debug renderers, plus Scarpet `draw_shape` shapes when Carpet is installed), and a client gametest (`./gradlew runClientGameTest`).
 
 
 [![curseforge](https://img.shields.io/badge/-CurseForge-gray?style=for-the-badge&logo=curseforge&labelColor=orange)](https://www.curseforge.com/minecraft/mc-mods/isometric-renders)

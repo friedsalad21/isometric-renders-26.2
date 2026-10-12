@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.MeshData;
 import org.joml.Vector3f;
 import com.mojang.blaze3d.IndexType;
 import com.mojang.blaze3d.vertex.VertexSorting;
+import com.glisco.isometricrenders.compat.IrisCompat;
 import io.wispforest.worldmesher.render.FluidVertexConsumer;
 import io.wispforest.worldmesher.render.MeshRenderView;
 import net.minecraft.client.Minecraft;
@@ -25,6 +26,8 @@ import net.minecraft.util.Util;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -38,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -297,7 +301,7 @@ public class WorldMesh {
                 ? MeshState.REBUILDING
                 : MeshState.BUILDING;
 
-        this.buildFuture = CompletableFuture.runAsync(this::build, executor).whenComplete((unused, throwable) -> {
+        this.buildFuture = CompletableFuture.runAsync(() -> IrisCompat.withoutVertexExtension(this::build), executor).whenComplete((unused, throwable) -> {
             this.buildFuture = null;
 
             if (throwable == null) {
@@ -336,20 +340,15 @@ public class WorldMesh {
                     .stream()
                     .map(entity -> {
                         if (this.freezeEntities) {
-                            var originalEntity = entity;
-                            entity = entity.getType().create(client.level, EntitySpawnReason.LOAD);
-
-                            entity.restoreFrom(originalEntity);
-                            entity.setId(originalEntity.getId());
-                            entity.copyPosition(originalEntity);
-                            entity.tick();
+                            entity = frozenCopy(client, entity);
+                            if (entity == null) return null;
                         }
 
                         return new DynamicRenderInfo.EntityEntry(
                                 entity,
                                 client.getEntityRenderDispatcher().getPackedLightCoords(entity, 0)
                         );
-                    }).toList());
+                    }).filter(Objects::nonNull).toList());
         });
 
         var blockEntities = new HashMap<BlockPos, BlockEntity>();
@@ -453,6 +452,34 @@ public class WorldMesh {
         );
     }
 
+    private static @Nullable Entity frozenCopy(Minecraft client, Entity original) {
+        // Players can't be created from their type, they need a profile for name and skin
+        if (original instanceof AbstractClientPlayer player) {
+            final var copy = new RemotePlayer(client.level, player.getGameProfile());
+            copy.restoreFrom(player);
+            copy.setId(player.getId());
+            copy.copyPosition(player);
+
+            // Skin layers, main hand and pose aren't saved with the entity
+            final var syncedData = player.getEntityData().getNonDefaultValues();
+            if (syncedData != null) copy.getEntityData().assignValues(syncedData);
+
+            copy.setYHeadRot(player.getYHeadRot());
+            copy.setYBodyRot(player.yBodyRot);
+            copy.setOldPosAndRot();
+            return copy;
+        }
+
+        final var copy = original.getType().create(client.level, EntitySpawnReason.LOAD);
+        if (copy == null) return null;
+
+        copy.restoreFrom(original);
+        copy.setId(original.getId());
+        copy.copyPosition(original);
+        copy.tick();
+        return copy;
+    }
+
     public static class Builder {
 
         private final BlockAndTintGetter world;
@@ -485,7 +512,7 @@ public class WorldMesh {
         }
 
         public Builder(ClientLevel world, BlockPos origin, BlockPos end) {
-            this(world, origin, end, (except, min, max) -> world.getEntities(except, AABB.encapsulatingFullBlocks(min, max), entity -> !(entity instanceof Player)));
+            this(world, origin, end, (except, min, max) -> world.getEntities(except, AABB.encapsulatingFullBlocks(min, max), entity -> true));
         }
 
 

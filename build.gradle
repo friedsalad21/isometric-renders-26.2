@@ -24,6 +24,11 @@ loom {
     // Dev and test runs: enough memory for big area renders and shader packs
     runs.configureEach {
         vmArg "-Xmx8G"
+
+        // gizmolib isn't published anywhere, -PgizmolibJar=<path> loads a local jar as an extra mod
+        if (project.hasProperty("gizmolibJar")) {
+            vmArg "-Dfabric.addMods=${project.property("gizmolibJar")}"
+        }
     }
 }
 
@@ -33,6 +38,17 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     implementation "io.wispforest:owo-lib:${project.owo_version}"
     include "io.wispforest:owo-sentinel:${project.owo_version}"
+
+    // Optional: Scarpet shapes show up in area renders when Carpet is installed
+    compileOnly "maven.modrinth:carpet:${project.carpet_version}"
+    localRuntime "maven.modrinth:carpet:${project.carpet_version}"
+
+    // Iris API to keep renders working with shader packs; Iris + Sodium only run in dev with -PwithShaders
+    compileOnly "maven.modrinth:iris:${project.iris_version}"
+    if (project.hasProperty("withShaders")) {
+        localRuntime "maven.modrinth:iris:${project.iris_version}"
+        localRuntime "maven.modrinth:sodium:${project.sodium_version}"
+    }
 
     // Litematica (+ malilib) in dev runs with -PwithLitematica, for pasting test builds from schematics
     if (project.hasProperty("withLitematica")) {
@@ -75,3 +91,4 @@ fabricApi {
         eula = true
     }
 }
+
