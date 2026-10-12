@@ -65,6 +65,9 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
             return;
         }
 
+        // Diagnostic: don't draw the old mesh while a new one builds
+        if (mesh.state() == WorldMesh.MeshState.REBUILDING) return;
+
         matrices.setIdentity();
         matrices.translate(-xSize / 2f, -ySize / 2f, -zSize / 2f);
 
