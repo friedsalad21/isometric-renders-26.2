@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.MeshData;
 import org.joml.Vector3f;
 import com.mojang.blaze3d.IndexType;
 import com.mojang.blaze3d.vertex.VertexSorting;
+import com.glisco.isometricrenders.compat.IrisCompat;
 import io.wispforest.worldmesher.render.FluidVertexConsumer;
 import io.wispforest.worldmesher.render.MeshRenderView;
 import net.minecraft.client.Minecraft;
@@ -300,7 +301,7 @@ public class WorldMesh {
                 ? MeshState.REBUILDING
                 : MeshState.BUILDING;
 
-        this.buildFuture = CompletableFuture.runAsync(this::build, executor).whenComplete((unused, throwable) -> {
+        this.buildFuture = CompletableFuture.runAsync(() -> IrisCompat.withoutVertexExtension(this::build), executor).whenComplete((unused, throwable) -> {
             this.buildFuture = null;
 
             if (throwable == null) {

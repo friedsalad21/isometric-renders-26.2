@@ -1,6 +1,7 @@
 package com.glisco.isometricrenders.render;
 
 import com.glisco.isometricrenders.compat.CarpetShapes;
+import com.glisco.isometricrenders.compat.GizmoLibShapes;
 import com.glisco.isometricrenders.mixin.access.CameraInvoker;
 import com.glisco.isometricrenders.mixin.access.EntityHitboxDebugRendererInvoker;
 import net.fabricmc.loader.api.FabricLoader;
@@ -30,7 +31,7 @@ import java.util.function.Predicate;
 
 /**
  * Captures what the world renderer would draw as debug overlays (F3 hitboxes,
- * chunk borders and every other debug renderer, plus Scarpet shapes from Carpet)
+ * chunk borders and every other debug renderer, plus Scarpet shapes from Carpet and gizmolib)
  * so area renders can include them
  */
 public final class DebugOverlays {
@@ -83,6 +84,9 @@ public final class DebugOverlays {
 
             submitDebugRenderers(client, levelState.cameraRenderState, origin, area, liveEntities, frozenEntities, tickDelta, storage);
             if (CARPET_LOADED) CarpetShapes.submit(storage, levelState, tickDelta);
+            if (client.level != null) {
+                GizmoLibShapes.submit(storage, levelState.cameraRenderState, client.level, origin, client.getDeltaTracker().getGameTimeDeltaPartialTick(false));
+            }
         } finally {
             ((CameraInvoker) camera).isometric$setPosition(previousPosition);
             ((CameraInvoker) camera).isometric$setRotation(previousYaw, previousPitch);
@@ -104,6 +108,7 @@ public final class DebugOverlays {
         try (var ignored = Gizmos.withCollector(collector)) {
             client.levelExtractor.debugRenderer.emitGizmos(frustum, origin.x, origin.y, origin.z, tickDelta);
             client.levelExtractor.gameTestBlockHighlightRenderer.emitGizmos();
+            GizmoLibShapes.emitShapes(client.level, origin, client.getDeltaTracker().getGameTimeDeltaPartialTick(false));
         } finally {
             collectingArea = null;
             liveEntities = entity -> true;

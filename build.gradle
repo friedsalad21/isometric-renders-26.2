@@ -20,6 +20,16 @@ repositories {
 
 loom {
     accessWidenerPath = file("src/main/resources/isometricrenders.accesswidener")
+
+    // Dev and test runs: enough memory for big area renders and shader packs
+    runs.configureEach {
+        vmArg "-Xmx8G"
+
+        // gizmolib isn't published anywhere, -PgizmolibJar=<path> loads a local jar as an extra mod
+        if (project.hasProperty("gizmolibJar")) {
+            vmArg "-Dfabric.addMods=${project.property("gizmolibJar")}"
+        }
+    }
 }
 
 dependencies {
@@ -32,6 +42,19 @@ dependencies {
     // Optional: Scarpet shapes show up in area renders when Carpet is installed
     compileOnly "maven.modrinth:carpet:${project.carpet_version}"
     localRuntime "maven.modrinth:carpet:${project.carpet_version}"
+
+    // Iris API to keep renders working with shader packs; Iris + Sodium only run in dev with -PwithShaders
+    compileOnly "maven.modrinth:iris:${project.iris_version}"
+    if (project.hasProperty("withShaders")) {
+        localRuntime "maven.modrinth:iris:${project.iris_version}"
+        localRuntime "maven.modrinth:sodium:${project.sodium_version}"
+    }
+
+    // Litematica (+ malilib) in dev runs with -PwithLitematica, for pasting test builds from schematics
+    if (project.hasProperty("withLitematica")) {
+        localRuntime "maven.modrinth:litematica:${project.litematica_version}"
+        localRuntime "maven.modrinth:malilib:${project.malilib_version}"
+    }
 }
 
 processResources {
@@ -68,3 +91,4 @@ fabricApi {
         eula = true
     }
 }
+

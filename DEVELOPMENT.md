@@ -17,11 +17,25 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   `ShapesRenderer` with the main camera moved to the area's origin, then clips the gizmos to the area.
   Toggles under Mesh Controls. Carpet is optional (`compat/CarpetShapes` is only loaded when it's installed).
   Carpet 26.2 itself doesn't draw Scarpet `label` shapes, so those don't show up in renders either.
+- gizmolib (a Scarpet extension that replaces `draw_shape`, unpublished): `compat/GizmoLibShapes` calls its client
+  stores by reflection (`ShapeStore.emit`, `GhostBlocks` / `SolidFills` / `TextDisplays.submit`) with the camera at
+  the area origin. Shape outlines are clipped like other gizmos; ghost blocks, solid fills and text aren't. Dev runs
+  load a local jar with `-PgizmolibJar=<path>` (never commit the jar). Its `gizmo_*` functions send to the player
+  running them, so the test runs them via `execute as @p`.
 - Area render entities: with Freeze Entities on, the mesh keeps copies taken at build time (players are copied as
   `RemotePlayer`s since they can't be created from their type). With it off, entities are looked up from the world
   every frame, so new ones appear and dead ones go away. Show Entities / Show Players hide them, hitboxes included;
   the local player is never drawn.
-- `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`.
+- `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`. Tests run in an
+  empty creative void world (`TestWorlds.emptyCreative`), so builds have no terrain around them.
+- Shader packs (Iris): `ISO_SHADERPACKS=<dir with pack zips> ./gradlew -PwithShaders runClientGameTest` adds Iris +
+  Sodium to the dev run and `ShaderPackClientGameTest` renders a translucent-heavy scene with every pack on its lowest
+  profile (exports in `build/run/clientGameTest/renders/`, one per pack after the plain one). Tested with the 10 most
+  downloaded Iris packs: renders match the no-shader one apart from the pack's lighting tweaks (AO strength,
+  directional shading). Photon doesn't load on software GL. `compat/IrisCompat` turns off Iris' vertex format
+  extension while area meshes build: Iris decides that from a global "extracting a frame" flag, so a background mesh
+  build could otherwise get Iris' wider vertex format that vanilla's pipelines can't read.
+- `-PwithLitematica` adds Litematica + malilib to dev and test runs (for building test scenes from schematics).
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,
 the `/isorender` commands typed in-game.
