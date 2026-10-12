@@ -13,6 +13,10 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
 - Exports un-premultiply alpha, so translucent blocks no longer come out washed out.
 - Area meshes re-sort translucent quads for the render's view direction, not the player camera.
 - Export anti-aliasing: supersampling Off/2x/4x (default 2x), backs off above an 8192 render size.
+- Debug overlays in area renders: `render/DebugOverlays` runs the vanilla `DebugRenderer` and Carpet's
+  `ShapesRenderer` with the main camera moved to the area's origin, then clips the gizmos to the area.
+  Toggles under Mesh Controls. Carpet is optional (`compat/CarpetShapes` is only loaded when it's installed).
+  Carpet 26.2 itself doesn't draw Scarpet `label` shapes, so those don't show up in renders either.
 - `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`.
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,
