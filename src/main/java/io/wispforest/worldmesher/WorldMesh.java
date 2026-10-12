@@ -39,7 +39,6 @@ import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayDeque;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Objects;
@@ -76,12 +75,6 @@ public class WorldMesh {
 
     // Vertex storage
     private final Map<ChunkSectionLayer, UploadedLayer> bufferStorage = new EnumMap<>(ChunkSectionLayer.class);
-
-    // Buffers replaced by a rebuild, kept alive for a moment before they are closed
-    private final ArrayDeque<RetiredLayer> retiredBuffers = new ArrayDeque<>();
-    private static final long RETIRED_BUFFER_LIFETIME = 1_000_000_000L;
-
-    private record RetiredLayer(UploadedLayer layer, long closeAt) {}
 
     // Translucent quads are re-sorted whenever the view direction changes,
     // the render's camera has nothing to do with the player's
@@ -126,8 +119,6 @@ public class WorldMesh {
             throw new IllegalStateException("World mesh not prepared!");
         }
 
-        this.closeRetiredBuffers(false);
-
         final var modelView = RenderSystem.getModelViewStack();
         modelView.pushMatrix();
         modelView.mul(transform);
@@ -169,13 +160,6 @@ public class WorldMesh {
         try (var sorted = this.translucentSort.buildSortedIndexBuffer(this.sortBuffer, VertexSorting.byDistance(eye.x, eye.y, eye.z))) {
             if (sorted == null) return;
             RenderSystem.getDevice().createCommandEncoder().writeToBuffer(uploaded.indices.slice(), sorted.byteBuffer());
-        }
-    }
-
-    private void closeRetiredBuffers(boolean all) {
-        final long now = System.nanoTime();
-        while (!this.retiredBuffers.isEmpty() && (all || this.retiredBuffers.peek().closeAt() <= now)) {
-            this.retiredBuffers.poll().layer().close();
         }
     }
 
@@ -287,7 +271,6 @@ public class WorldMesh {
     public void reset() {
         this.bufferStorage.values().forEach(UploadedLayer::close);
         this.bufferStorage.clear();
-        this.closeRetiredBuffers(true);
         this.releaseSortState();
 
         this.state = MeshState.NEW;
@@ -422,10 +405,7 @@ public class WorldMesh {
         var future = new CompletableFuture<Void>();
         client.execute(() -> {
             try {
-                // With shaders on, closing the old buffers right away (and handing their GL names
-                // straight back out) garbled some rebuilds, so they only get closed a bit later
-                final long closeAt = System.nanoTime() + RETIRED_BUFFER_LIFETIME;
-                this.bufferStorage.values().forEach(uploaded -> this.retiredBuffers.add(new RetiredLayer(uploaded, closeAt)));
+                this.bufferStorage.values().forEach(UploadedLayer::close);
                 this.bufferStorage.clear();
                 this.releaseSortState();
 
