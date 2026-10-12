@@ -1,4 +1,11 @@
-# Isometric Renders
+# Isometric Renders — Minecraft 26.2 port
+
+> **Unofficial port** of [glisco03/isometric-renders](https://github.com/glisco03/isometric-renders) (1.21.4, MIT) to Minecraft **26.2** (Fabric, owo-lib 0.13.1+26.2).
+> Not affiliated with the original author; report port bugs here, not upstream. See [HANDOFF.md](HANDOFF.md) for the port's state and dev workflow.
+>
+> Port-only additions: export anti-aliasing (supersampling Off/2x/4x), correct colors for translucent blocks in exports,
+> view-based translucent sorting in area renders, and a client gametest (`./gradlew runClientGameTest`).
+
 
 [![curseforge](https://img.shields.io/badge/-CurseForge-gray?style=for-the-badge&logo=curseforge&labelColor=orange)](https://www.curseforge.com/minecraft/mc-mods/isometric-renders)
 [![modrinth](https://img.shields.io/badge/-modrinth-gray?style=for-the-badge&labelColor=green&labelWidth=15&logo=appveyor&logoColor=white)](https://modrinth.com/mod/isometric-renders)
