@@ -3,13 +3,13 @@
   "id": "isometric-renders",
   "version": "${version}",
   "name": "Isometric Renders",
-  "description": "Creates high-resolution renders of game objects",
+  "description": "Creates high-resolution renders of game objects (unofficial 26.2 port)",
   "authors": [
     "glisco"
   ],
   "contact": {
-    "issues": "https://github.com/gliscowo/isometric-renders/issues",
-    "sources": "https://github.com/gliscowo/isometric-renders"
+    "issues": "https://github.com/friedsalad21/isometric-renders-26.2/issues",
+    "sources": "https://github.com/friedsalad21/isometric-renders-26.2"
   },
   "license": "MIT",
   "icon": "assets/isometric-renders/icon.png",

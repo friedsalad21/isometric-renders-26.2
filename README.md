@@ -1,7 +1,10 @@
 # Isometric Renders — Minecraft 26.2 port
 
 > **Unofficial port** of [glisco03/isometric-renders](https://github.com/glisco03/isometric-renders) (1.21.4, MIT) to Minecraft **26.2** (Fabric, owo-lib 0.13.1+26.2).
-> Not affiliated with the original author; report port bugs here, not upstream. See [HANDOFF.md](HANDOFF.md) for the port's state and dev workflow.
+> Not affiliated with the original author; report port bugs here, not upstream. See [DEVELOPMENT.md](DEVELOPMENT.md) for the port's state and dev workflow.
+>
+> **Download:** grab the jar from [Releases](../../releases) and drop it in your `mods` folder (needs Fabric API and owo-lib for 26.2).
+> To update, replace the old jar with the new one. Older versions stay available on the Releases page.
 >
 > Port-only additions: export anti-aliasing (supersampling Off/2x/4x), correct colors for translucent blocks in exports,
 > view-based translucent sorting in area renders, and a client gametest (`./gradlew runClientGameTest`).
