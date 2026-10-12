@@ -35,6 +35,10 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   directional shading). Photon doesn't load on software GL. `compat/IrisCompat` turns off Iris' vertex format
   extension while area meshes build: Iris decides that from a global "extracting a frame" flag, so a background mesh
   build could otherwise get Iris' wider vertex format that vanilla's pipelines can't read.
+  `ISO_SHADER_FILTER=<part of a zip name>` picks packs, `ISO_SHADER_PROFILE=<name>` (e.g. `MEDIUM`) uses that profile
+  instead of the lowest, `ISO_BUILDS=<dir with .litematic files>` also pastes and renders those builds (works without
+  `-PwithShaders` too), and `ISO_ONLY_SHADERS=1` skips the main gametest. `Litematic` pastes schematics without block
+  updates, so redstone stays as saved.
 - `-PwithLitematica` adds Litematica + malilib to dev and test runs (for building test scenes from schematics).
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,
