@@ -32,6 +32,13 @@ dependencies {
     // Optional: Scarpet shapes show up in area renders when Carpet is installed
     compileOnly "maven.modrinth:carpet:${project.carpet_version}"
     localRuntime "maven.modrinth:carpet:${project.carpet_version}"
+
+    // Iris API to keep renders working with shader packs; Iris + Sodium only run in dev with -PwithShaders
+    compileOnly "maven.modrinth:iris:${project.iris_version}"
+    if (project.hasProperty("withShaders")) {
+        localRuntime "maven.modrinth:iris:${project.iris_version}"
+        localRuntime "maven.modrinth:sodium:${project.sodium_version}"
+    }
 }
 
 processResources {

@@ -22,6 +22,13 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   every frame, so new ones appear and dead ones go away. Show Entities / Show Players hide them, hitboxes included;
   the local player is never drawn.
 - `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`.
+- Shader packs (Iris): `ISO_SHADERPACKS=<dir with pack zips> ./gradlew -PwithShaders runClientGameTest` adds Iris +
+  Sodium to the dev run and `ShaderPackClientGameTest` renders a translucent-heavy scene with every pack on its lowest
+  profile (exports in `build/run/clientGameTest/renders/`, one per pack after the plain one). Tested with the 10 most
+  downloaded Iris packs: renders match the no-shader one apart from the pack's lighting tweaks (AO strength,
+  directional shading). Photon doesn't load on software GL. `compat/IrisCompat` turns off Iris' vertex format
+  extension while area meshes build: Iris decides that from a global "extracting a frame" flag, so a background mesh
+  build could otherwise get Iris' wider vertex format that vanilla's pipelines can't read.
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,
 the `/isorender` commands typed in-game.
