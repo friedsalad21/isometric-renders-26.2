@@ -92,6 +92,10 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
             entityDispatcher.submit(state, camera, vec3d.x, vec3d.y, vec3d.z, matrices, collector);
         });
 
+        if (this.properties().debugOverlays.get()) {
+            this.renderDebugOverlays(matrices, Vec3.atLowerCornerOf(mesh.startPos()), mesh.dimensions(), this.properties().clipDebugOverlays.get(), tickDelta);
+        }
+
         var diff = Vec3.atLowerCornerOf(mesh.startPos()).subtract(client.player.position());
         matrices.translate(-diff.x, -diff.y + 1.65, -diff.z);
 
@@ -134,6 +138,8 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
         private static final AreaPropertyBundle INSTANCE = new AreaPropertyBundle();
 
         public final Property<Boolean> freezeEntities = Property.of(true);
+        public final Property<Boolean> debugOverlays = Property.of(true);
+        public final Property<Boolean> clipDebugOverlays = Property.of(true);
 
         @Override
         public void buildGuiControls(Renderable<?> renderable, FlowLayout container) {
@@ -163,6 +169,9 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
             this.freezeEntities.listen((booleanProperty, aBoolean) -> {
                 mesh.setFreezeEntities(aBoolean);
             });
+
+            IsometricUI.booleanControl(container, this.debugOverlays, "debug_overlays");
+            IsometricUI.booleanControl(container, this.clipDebugOverlays, "clip_debug_overlays");
 
             container.child(UIComponents.button(Translate.gui("rebuild_mesh"), (ButtonComponent button) -> mesh.scheduleRebuild())
                     .horizontalSizing(Sizing.fixed(80))

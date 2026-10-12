@@ -12,6 +12,8 @@ import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.ParticlesRenderState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -24,6 +26,9 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
 
     private @Nullable SubmitNodeStorage pendingParticles;
     private final Matrix4f particleTransform = new Matrix4f();
+
+    private @Nullable SubmitNodeStorage pendingDebugOverlays;
+    private final Matrix4f debugOverlayTransform = new Matrix4f();
 
     @Override
     public void setupLighting(Matrix4f modelViewMatrix) {
@@ -49,18 +54,39 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
 
     @Override
     public void draw(Matrix4f modelViewMatrix) {
-        if (this.pendingParticles == null) return;
+        // Particles and debug overlays are positioned relative to the
+        // camera, so they need their own model view matrix
+        if (this.pendingParticles != null) {
+            drawWithTransform(this.pendingParticles, this.particleTransform);
+            this.pendingParticles = null;
+        }
 
-        // Particles are positioned relative to the camera, so
-        // they need their own model view matrix
+        if (this.pendingDebugOverlays != null) {
+            drawWithTransform(this.pendingDebugOverlays, this.debugOverlayTransform);
+            this.pendingDebugOverlays = null;
+        }
+    }
+
+    private static void drawWithTransform(SubmitNodeStorage submits, Matrix4f transform) {
         final var modelView = RenderSystem.getModelViewStack();
         modelView.pushMatrix();
-        modelView.mul(this.particleTransform);
+        modelView.mul(transform);
 
-        Minecraft.getInstance().gameRenderer.featureRenderDispatcher().renderAllFeatures(this.pendingParticles);
+        Minecraft.getInstance().gameRenderer.featureRenderDispatcher().renderAllFeatures(submits);
 
         modelView.popMatrix();
-        this.pendingParticles = null;
+    }
+
+    /**
+     * Captures the world's debug overlays inside {@code area}, drawn with {@code origin} at the current pose
+     */
+    protected void renderDebugOverlays(PoseStack matrices, Vec3 origin, AABB area, boolean clip, float tickDelta) {
+        this.pendingDebugOverlays = DebugOverlays.collect(origin, area, this.cameraYaw(), this.properties().slant.get(), clip, tickDelta);
+        this.debugOverlayTransform.set(matrices.last().pose());
+    }
+
+    private float cameraYaw() {
+        return this.properties().rotation.get() + 180 + this.properties().rotationOffset();
     }
 
     protected void renderParticles(PoseStack matrices, float tickDelta) {
@@ -68,7 +94,7 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
         final var camera = client.gameRenderer.mainCamera();
         final float previousYaw = camera.yRot(), previousPitch = camera.xRot();
 
-        ((CameraInvoker) camera).isometric$setRotation(this.properties().rotation.get() + 180 + this.properties().rotationOffset(), this.properties().slant.get());
+        ((CameraInvoker) camera).isometric$setRotation(this.cameraYaw(), this.properties().slant.get());
 
         final var cameraState = new CameraRenderState();
         camera.extractRenderState(cameraState, tickDelta);

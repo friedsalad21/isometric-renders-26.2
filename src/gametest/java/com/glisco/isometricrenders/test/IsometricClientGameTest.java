@@ -4,6 +4,8 @@ import com.glisco.isometricrenders.render.*;
 import com.glisco.isometricrenders.screen.RenderScreen;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.minecraft.client.gui.components.debug.DebugScreenEntries;
+import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -45,6 +47,33 @@ public class IsometricClientGameTest implements FabricClientGameTest {
             shot(context, "entity_zombie", () -> EntityRenderable.of(BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.withDefaultNamespace("zombie")), null));
             shot(context, "tooltip_sword", () -> new TooltipRenderable(new ItemStack(Items.DIAMOND_SWORD)));
             shot(context, "area", () -> AreaRenderable.of(origin, origin.offset(4, 3, 4)));
+
+            // Debug overlays: F3 hitboxes + chunk borders and Scarpet shapes from Carpet
+            context.runOnClient(client -> {
+                client.debugEntries.setStatus(DebugScreenEntries.ENTITY_HITBOXES, DebugScreenEntryStatus.ALWAYS_ON);
+                client.debugEntries.setStatus(DebugScreenEntries.CHUNK_BORDERS, DebugScreenEntryStatus.ALWAYS_ON);
+            });
+            final double cx = origin.getX() + 2.5, cy = origin.getY() + 2, cz = origin.getZ() + 2.5;
+            server.runCommand("script run draw_shape('sphere', 2400, 'center', [" + cx + ", " + cy + ", " + cz + "], 'radius', 1.5, 'color', 0xFF00FFFF, 'line', 3)");
+            server.runCommand("script run draw_shape('box', 2400, 'from', [" + origin.getX() + ", " + (origin.getY() + 1) + ", " + origin.getZ() + "], 'to', [" + (origin.getX() + 2) + ", " + (origin.getY() + 3) + ", " + (origin.getZ() + 2) + "], 'color', 0x00FFFFFF, 'fill', 0x00FFFF40)");
+            context.waitTicks(10);
+            shot(context, "area_debug", () -> AreaRenderable.of(origin, origin.offset(4, 3, 4)));
+
+            final var debugExport = new AtomicReference<File>();
+            context.setScreen(() -> {
+                var screen = new RenderScreen(AreaRenderable.of(origin, origin.offset(4, 3, 4)));
+                screen.setExportCallback(debugExport::set);
+                return screen;
+            });
+            context.waitTicks(30);
+            context.runOnClient(client -> ((RenderScreen) client.gui.screen()).scheduleCapture());
+            context.waitFor(client -> debugExport.get() != null, 200);
+            System.out.println("[isometric-gametest] exported " + debugExport.get().getAbsolutePath());
+            context.runOnClient(client -> {
+                client.debugEntries.setStatus(DebugScreenEntries.ENTITY_HITBOXES, DebugScreenEntryStatus.NEVER);
+                client.debugEntries.setStatus(DebugScreenEntries.CHUNK_BORDERS, DebugScreenEntryStatus.NEVER);
+            });
+            server.runCommand("script run clear_shapes()");
             // Layers of stacked translucent blocks to check sorting
             final var glass = origin.offset(0, 0, 8);
             server.runCommand("fill " + glass.getX() + " " + glass.getY() + " " + glass.getZ() + " " + (glass.getX() + 6) + " " + (glass.getY() + 3) + " " + (glass.getZ() + 3) + " minecraft:air");
