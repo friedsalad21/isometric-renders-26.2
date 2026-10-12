@@ -6,6 +6,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import org.joml.Vector3f;
 import com.mojang.blaze3d.IndexType;
@@ -128,11 +129,17 @@ public class WorldMesh {
             if (layer.translucent()) this.resortIfNeeded(modelView, uploaded);
             renderStartAction.run();
 
-            final var indices = uploaded.indices != null
-                    ? uploaded.indices
-                    : RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).getBuffer(uploaded.indexCount);
+            // The shared sequential buffer switches to int indices when it grows past 65k vertices,
+            // so its type has to be read after getBuffer, not cached at upload
+            var indices = uploaded.indices;
+            var indexType = uploaded.indexType;
+            if (indices == null) {
+                final var sequential = RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
+                indices = sequential.getBuffer(uploaded.indexCount);
+                indexType = sequential.type();
+            }
 
-            renderTypeFor(layer).prepare().drawFromBuffer(uploaded.vertices, indices, uploaded.indexType, 0, 0, uploaded.indexCount);
+            renderTypeFor(layer).prepare().drawFromBuffer(uploaded.vertices, indices, indexType, 0, 0, uploaded.indexCount);
 
             renderEndAction.run();
         });
@@ -326,7 +333,9 @@ public class WorldMesh {
         var allocators = new EnumMap<ChunkSectionLayer, ByteBufferBuilder>(ChunkSectionLayer.class);
         Function<ChunkSectionLayer, BufferBuilder> builderFor = layer -> builders.computeIfAbsent(layer, $ -> {
             var allocator = allocators.computeIfAbsent(layer, $$ -> new ByteBufferBuilder(layer.bufferSize()));
-            return new BufferBuilder(allocator, PrimitiveTopology.QUADS, layer.vertexFormat());
+            // Not layer.vertexFormat(): that asks the layer's pipeline, which Iris answers with its own
+            // wider format whenever a pack is on and the render thread happens to be drawing the world
+            return new BufferBuilder(allocator, PrimitiveTopology.QUADS, DefaultVertexFormat.BLOCK);
         });
 
         BlockQuadOutput quadOutput = (x, y, z, quad, instance) -> builderFor.apply(quad.materialInfo().layer()).putBlockBakedQuad(x, y, z, quad, instance);
@@ -422,11 +431,7 @@ public class WorldMesh {
                                 : null;
 
                         var drawState = mesh.drawState();
-                        var indexType = indices != null
-                                ? drawState.indexType()
-                                : RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS).type();
-
-                        this.bufferStorage.put(layer, new UploadedLayer(vertices, indices, indexType, drawState.indexCount()));
+                        this.bufferStorage.put(layer, new UploadedLayer(vertices, indices, drawState.indexType(), drawState.indexCount()));
                     }
                 });
 
