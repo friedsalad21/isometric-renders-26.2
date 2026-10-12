@@ -26,7 +26,8 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   `RemotePlayer`s since they can't be created from their type). With it off, entities are looked up from the world
   every frame, so new ones appear and dead ones go away. Show Entities / Show Players hide them, hitboxes included;
   the local player is never drawn.
-- `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`.
+- `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`. Tests run in an
+  empty creative void world (`TestWorlds.emptyCreative`), so builds have no terrain around them.
 - Shader packs (Iris): `ISO_SHADERPACKS=<dir with pack zips> ./gradlew -PwithShaders runClientGameTest` adds Iris +
   Sodium to the dev run and `ShaderPackClientGameTest` renders a translucent-heavy scene with every pack on its lowest
   profile (exports in `build/run/clientGameTest/renders/`, one per pack after the plain one). Tested with the 10 most

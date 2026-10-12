@@ -24,7 +24,7 @@ public class IsometricClientGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        try (var world = context.worldBuilder().create()) {
+        try (var world = TestWorlds.emptyCreative(context)) {
             context.waitTicks(40);
 
             final BlockPos origin = context.computeOnClient(client -> client.player.blockPosition()).offset(3, 0, 0);
@@ -66,7 +66,8 @@ public class IsometricClientGameTest implements FabricClientGameTest {
                 server.runCommand("execute as @p at @s run script run gizmo_blocks('iso_ghost', [[" + (origin.getX() + 4) + ", " + (origin.getY() + 1) + ", " + origin.getZ() + "]], 'gold_block', 128)");
                 server.runCommand("execute as @p at @s run script run gizmo_text('iso_text', {'pos' -> [" + (origin.getX() + 2.5) + ", " + (origin.getY() + 3.2) + ", " + (origin.getZ() + 0.5) + "], 'text' -> 'gizmo label', 'scale' -> 1, 'through' -> true})");
                 context.setScreen(() -> null);
-                server.runCommand("tp @p " + (origin.getX() - 3) + " " + (origin.getY() + 4) + " " + (origin.getZ() - 3) + " facing " + cx + " " + cy + " " + cz);
+                server.runCommand("setblock " + (origin.getX() - 3) + " " + (origin.getY() + 3) + " " + (origin.getZ() - 3) + " minecraft:barrier");
+                server.runCommand("tp @p " + (origin.getX() - 2.5) + " " + (origin.getY() + 4) + " " + (origin.getZ() - 2.5) + " facing " + cx + " " + cy + " " + cz);
                 context.waitTicks(20);
                 System.out.println("[isometric-gametest] screenshot " + context.takeScreenshot("world_gizmolib"));
                 context.runOnClient(client -> {

@@ -44,7 +44,7 @@ public class ShaderPackClientGameTest implements FabricClientGameTest {
             throw new RuntimeException(e);
         }
 
-        try (var world = context.worldBuilder().create()) {
+        try (var world = TestWorlds.emptyCreative(context)) {
             context.runOnClient(client -> client.options.renderDistance().set(4));
             context.waitTicks(40);
 
