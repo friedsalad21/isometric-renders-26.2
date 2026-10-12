@@ -72,6 +72,27 @@ public class IsometricClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> ((RenderScreen) client.gui.screen()).scheduleCapture());
             context.waitFor(client -> debugExport.get() != null, 200);
             System.out.println("[isometric-gametest] exported " + debugExport.get().getAbsolutePath());
+            // Live entities: a Carpet bot player, a mob spawned after the render opened and one that died
+            final var areaProperties = AreaRenderable.AreaPropertyBundle.instance();
+            server.runCommand("player Bot spawn at " + (origin.getX() + 0.5) + " " + (origin.getY() + 1) + " " + (origin.getZ() + 2.5));
+            context.runOnClient(client -> areaProperties.freezeEntities.set(false));
+            context.waitTicks(20);
+            shot(context, "area_bot_frozen_off", () -> AreaRenderable.of(origin, origin.offset(4, 3, 4)));
+            server.runCommand("summon minecraft:cow " + (origin.getX() + 4.5) + " " + (origin.getY() + 1) + " " + (origin.getZ() + 0.5) + " {NoAI:1b}");
+            server.runCommand("kill @e[type=minecraft:pig]");
+            context.waitTicks(40);
+            System.out.println("[isometric-gametest] screenshot " + context.takeScreenshot("area_live_spawn_death"));
+            context.runOnClient(client -> areaProperties.showPlayers.set(false));
+            context.waitTicks(5);
+            System.out.println("[isometric-gametest] screenshot " + context.takeScreenshot("area_players_hidden"));
+            context.runOnClient(client -> {
+                areaProperties.showPlayers.set(true);
+                areaProperties.freezeEntities.set(true);
+            });
+            shot(context, "area_bot_frozen_on", () -> AreaRenderable.of(origin, origin.offset(4, 3, 4)));
+            server.runCommand("player Bot kill");
+            server.runCommand("kill @e[type=minecraft:cow]");
+
             context.runOnClient(client -> {
                 client.debugEntries.setStatus(DebugScreenEntries.ENTITY_HITBOXES, DebugScreenEntryStatus.NEVER);
                 client.debugEntries.setStatus(DebugScreenEntries.CHUNK_BORDERS, DebugScreenEntryStatus.NEVER);

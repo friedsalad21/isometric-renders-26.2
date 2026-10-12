@@ -90,6 +90,8 @@
   "gui.isometric-renders.mesh_corrupt": {"text": "Corrupted - report this", "color": "red"},
   "gui.isometric-renders.mesh_ready": "Ready",
   "gui.isometric-renders.freeze_entities": "Freeze Entities",
+  "gui.isometric-renders.show_entities": "Show Entities",
+  "gui.isometric-renders.show_players": "Show Players",
   "gui.isometric-renders.debug_overlays": "Debug Overlays",
   "gui.isometric-renders.clip_debug_overlays": "Clip Overlays to Area",
   "gui.isometric-renders.rebuild_mesh": "Rebuild Mesh",

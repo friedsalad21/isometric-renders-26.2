@@ -17,6 +17,10 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   `ShapesRenderer` with the main camera moved to the area's origin, then clips the gizmos to the area.
   Toggles under Mesh Controls. Carpet is optional (`compat/CarpetShapes` is only loaded when it's installed).
   Carpet 26.2 itself doesn't draw Scarpet `label` shapes, so those don't show up in renders either.
+- Area render entities: with Freeze Entities on, the mesh keeps copies taken at build time (players are copied as
+  `RemotePlayer`s since they can't be created from their type). With it off, entities are looked up from the world
+  every frame, so new ones appear and dead ones go away. Show Entities / Show Players hide them, hitboxes included;
+  the local player is never drawn.
 - `runClientGameTest`: screenshots every render type into `build/run/clientGameTest/screenshots/`.
 
 **Not tested yet:** animation export (needs FFmpeg on PATH), batch renders, copy-to-clipboard, particles in renders,

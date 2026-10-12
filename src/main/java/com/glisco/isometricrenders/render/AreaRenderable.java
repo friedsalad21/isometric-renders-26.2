@@ -21,12 +21,14 @@ import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
 import java.util.HashMap;
+import java.util.function.Predicate;
 
 public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropertyBundle> {
 
@@ -81,35 +83,53 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
             matrices.popPose();
         });
 
-        final var effectiveDelta = mesh.entitiesFrozen() ? 0 : client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+        final var start = Vec3.atLowerCornerOf(mesh.startPos());
         final var entityDispatcher = client.getEntityRenderDispatcher();
-        mesh.renderInfo().entities().forEach((vec3d, entry) -> {
-            if (!mesh.entitiesFrozen()) {
-                vec3d = entry.entity().getPosition(effectiveDelta).subtract(mesh.startPos().getX(), mesh.startPos().getY(), mesh.startPos().getZ());
+        final var frozenEntities = new HashMap<Entity, Vec3>();
+        final Predicate<Entity> liveEntities;
+
+        if (mesh.entitiesFrozen()) {
+            mesh.renderInfo().entities().forEach((pos, entry) -> {
+                if (!this.isShown(entry.entity())) return;
+
+                // Frozen entities are drawn where they were when the mesh was built, their hitboxes should be too
+                this.submitEntity(entry.entity(), pos, entry.light(), 0, matrices, collector, camera);
+                frozenEntities.put(entry.entity(), start.add(pos));
+            });
+            liveEntities = entity -> false;
+        } else {
+            // Looked up every frame so new entities show up and dead ones go away
+            liveEntities = this::isShown;
+            for (var entity : client.level.getEntities(client.player, mesh.dimensions(), liveEntities)) {
+                final float partialTicks = client.getDeltaTracker().getGameTimeDeltaPartialTick(!entity.level().tickRateManager().isEntityFrozen(entity));
+                final var pos = entity.getPosition(partialTicks).subtract(start);
+                this.submitEntity(entity, pos, entityDispatcher.getPackedLightCoords(entity, partialTicks), partialTicks, matrices, collector, camera);
             }
-
-            final var state = entityDispatcher.extractEntity(entry.entity(), effectiveDelta);
-            state.lightCoords = entry.light();
-            state.nameTag = null;
-
-            entityDispatcher.submit(state, camera, vec3d.x, vec3d.y, vec3d.z, matrices, collector);
-        });
+        }
 
         if (this.properties().debugOverlays.get()) {
-            // Frozen entities are drawn where they were when the mesh was built, their hitboxes should be too
-            final var frozenEntities = new HashMap<Entity, Vec3>();
-            if (mesh.entitiesFrozen()) {
-                final var start = Vec3.atLowerCornerOf(mesh.startPos());
-                mesh.renderInfo().entities().forEach((pos, entry) -> frozenEntities.put(entry.entity(), start.add(pos)));
-            }
-
-            this.renderDebugOverlays(matrices, Vec3.atLowerCornerOf(mesh.startPos()), mesh.dimensions(), this.properties().clipDebugOverlays.get(), frozenEntities, tickDelta);
+            this.renderDebugOverlays(matrices, start, mesh.dimensions(), this.properties().clipDebugOverlays.get(), liveEntities, frozenEntities, tickDelta);
         }
 
         var diff = Vec3.atLowerCornerOf(mesh.startPos()).subtract(client.player.position());
         matrices.translate(-diff.x, -diff.y + 1.65, -diff.z);
 
         this.renderParticles(matrices, tickDelta);
+    }
+
+    private boolean isShown(Entity entity) {
+        // The local player is the one taking the render, they'd only be in the way
+        if (entity == client.player) return false;
+        return entity instanceof Player ? this.properties().showPlayers.get() : this.properties().showEntities.get();
+    }
+
+    private void submitEntity(Entity entity, Vec3 pos, int light, float partialTicks, PoseStack matrices, SubmitNodeCollector collector, CameraRenderState camera) {
+        final var entityDispatcher = client.getEntityRenderDispatcher();
+        final var state = entityDispatcher.extractEntity(entity, partialTicks);
+        state.lightCoords = light;
+        state.nameTag = null;
+
+        entityDispatcher.submit(state, camera, pos.x, pos.y, pos.z, matrices, collector);
     }
 
     @Override
@@ -147,7 +167,13 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
 
         private static final AreaPropertyBundle INSTANCE = new AreaPropertyBundle();
 
+        public static AreaPropertyBundle instance() {
+            return INSTANCE;
+        }
+
         public final Property<Boolean> freezeEntities = Property.of(true);
+        public final Property<Boolean> showEntities = Property.of(true);
+        public final Property<Boolean> showPlayers = Property.of(true);
         public final Property<Boolean> debugOverlays = Property.of(true);
         public final Property<Boolean> clipDebugOverlays = Property.of(true);
 
@@ -180,6 +206,8 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
                 mesh.setFreezeEntities(aBoolean);
             });
 
+            IsometricUI.booleanControl(container, this.showEntities, "show_entities");
+            IsometricUI.booleanControl(container, this.showPlayers, "show_players");
             IsometricUI.booleanControl(container, this.debugOverlays, "debug_overlays");
             IsometricUI.booleanControl(container, this.clipDebugOverlays, "clip_debug_overlays");
 

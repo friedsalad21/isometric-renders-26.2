@@ -26,6 +26,7 @@ import org.joml.Matrix4f;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * Captures what the world renderer would draw as debug overlays (F3 hitboxes,
@@ -37,7 +38,7 @@ public final class DebugOverlays {
     private static final boolean CARPET_LOADED = FabricLoader.getInstance().isModLoaded("carpet");
 
     private static @Nullable AABB collectingArea = null;
-    private static Map<Entity, Vec3> frozenEntities = Map.of();
+    private static Predicate<Entity> liveEntities = entity -> true;
 
     private DebugOverlays() {}
 
@@ -49,10 +50,10 @@ public final class DebugOverlays {
     }
 
     /**
-     * @return Whether the given entity is drawn at a frozen position, while debug renderers run
+     * @return Whether the given entity is drawn live at its current position, while debug renderers run
      */
-    public static boolean isFrozen(Entity entity) {
-        return frozenEntities.containsKey(entity);
+    public static boolean isLiveEntityShown(Entity entity) {
+        return liveEntities.test(entity);
     }
 
     /**
@@ -61,9 +62,10 @@ public final class DebugOverlays {
      * @param yaw            The camera yaw text and billboards should face
      * @param pitch          The camera pitch text and billboards should face
      * @param clip           Whether to cut off everything outside of {@code area}
+     * @param liveEntities   Which entities in the world the render draws live, only those get debug overlays
      * @param frozenEntities Entities drawn at a fixed position instead of their live one, their hitboxes follow
      */
-    public static SubmitNodeStorage collect(Vec3 origin, AABB area, float yaw, float pitch, boolean clip, Map<Entity, Vec3> frozenEntities, float tickDelta) {
+    public static SubmitNodeStorage collect(Vec3 origin, AABB area, float yaw, float pitch, boolean clip, Predicate<Entity> liveEntities, Map<Entity, Vec3> frozenEntities, float tickDelta) {
         final var client = Minecraft.getInstance();
         final var camera = client.gameRenderer.mainCamera();
         final float previousYaw = camera.yRot(), previousPitch = camera.xRot();
@@ -79,7 +81,7 @@ public final class DebugOverlays {
             final var levelState = new LevelRenderState();
             camera.extractRenderState(levelState.cameraRenderState, tickDelta);
 
-            submitDebugRenderers(client, levelState.cameraRenderState, origin, area, frozenEntities, tickDelta, storage);
+            submitDebugRenderers(client, levelState.cameraRenderState, origin, area, liveEntities, frozenEntities, tickDelta, storage);
             if (CARPET_LOADED) CarpetShapes.submit(storage, levelState, tickDelta);
         } finally {
             ((CameraInvoker) camera).isometric$setPosition(previousPosition);
@@ -89,7 +91,7 @@ public final class DebugOverlays {
         return storage;
     }
 
-    private static void submitDebugRenderers(Minecraft client, CameraRenderState cameraState, Vec3 origin, AABB area, Map<Entity, Vec3> frozen, float tickDelta, SubmitNodeStorage storage) {
+    private static void submitDebugRenderers(Minecraft client, CameraRenderState cameraState, Vec3 origin, AABB area, Predicate<Entity> live, Map<Entity, Vec3> frozen, float tickDelta, SubmitNodeStorage storage) {
         if (client.level == null || client.getConnection() == null) return;
 
         // Same everything-nearby frustum as particles, the area restriction happens later
@@ -98,13 +100,13 @@ public final class DebugOverlays {
 
         final var collector = new SimpleGizmoCollector();
         collectingArea = area;
-        frozenEntities = frozen;
+        liveEntities = live;
         try (var ignored = Gizmos.withCollector(collector)) {
             client.levelExtractor.debugRenderer.emitGizmos(frustum, origin.x, origin.y, origin.z, tickDelta);
             client.levelExtractor.gameTestBlockHighlightRenderer.emitGizmos();
         } finally {
             collectingArea = null;
-            frozenEntities = Map.of();
+            liveEntities = entity -> true;
         }
 
         // Gizmos sent by the game itself (debug commands, game tests, ...)

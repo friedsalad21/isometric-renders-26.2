@@ -19,7 +19,7 @@ public class LevelExtractorMixin {
         final var area = DebugOverlays.collectingArea();
         if (area == null) return;
 
-        // Frozen entities get their hitboxes drawn separately, at their frozen position
-        cir.setReturnValue(!DebugOverlays.isFrozen(entity) && area.intersects(entity.getBoundingBox()));
+        // Hidden entities get no overlays, frozen ones get their hitboxes drawn separately at their frozen position
+        cir.setReturnValue(DebugOverlays.isLiveEntityShown(entity) && area.intersects(entity.getBoundingBox()));
     }
 }
