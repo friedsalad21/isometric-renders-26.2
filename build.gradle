@@ -16,6 +16,11 @@ repositories {
 
 loom {
     accessWidenerPath = file("src/main/resources/isometricrenders.accesswidener")
+
+    // Dev and test runs: enough memory for big area renders and shader packs
+    runs.configureEach {
+        vmArg "-Xmx8G"
+    }
 }
 
 dependencies {
