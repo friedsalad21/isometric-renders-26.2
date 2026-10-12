@@ -6,6 +6,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import org.joml.Vector3f;
 import com.mojang.blaze3d.IndexType;
@@ -332,7 +333,9 @@ public class WorldMesh {
         var allocators = new EnumMap<ChunkSectionLayer, ByteBufferBuilder>(ChunkSectionLayer.class);
         Function<ChunkSectionLayer, BufferBuilder> builderFor = layer -> builders.computeIfAbsent(layer, $ -> {
             var allocator = allocators.computeIfAbsent(layer, $$ -> new ByteBufferBuilder(layer.bufferSize()));
-            return new BufferBuilder(allocator, PrimitiveTopology.QUADS, layer.vertexFormat());
+            // Not layer.vertexFormat(): that asks the layer's pipeline, which Iris answers with its own
+            // wider format whenever a pack is on and the render thread happens to be drawing the world
+            return new BufferBuilder(allocator, PrimitiveTopology.QUADS, DefaultVertexFormat.BLOCK);
         });
 
         BlockQuadOutput quadOutput = (x, y, z, quad, instance) -> builderFor.apply(quad.materialInfo().layer()).putBlockBakedQuad(x, y, z, quad, instance);
