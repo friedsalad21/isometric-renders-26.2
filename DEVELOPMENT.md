@@ -17,6 +17,11 @@ renders, export to PNG, area selection box, HUD, boots with Sodium.
   `ShapesRenderer` with the main camera moved to the area's origin, then clips the gizmos to the area.
   Toggles under Mesh Controls. Carpet is optional (`compat/CarpetShapes` is only loaded when it's installed).
   Carpet 26.2 itself doesn't draw Scarpet `label` shapes, so those don't show up in renders either.
+- gizmolib (a Scarpet extension that replaces `draw_shape`, unpublished): `compat/GizmoLibShapes` calls its client
+  stores by reflection (`ShapeStore.emit`, `GhostBlocks` / `SolidFills` / `TextDisplays.submit`) with the camera at
+  the area origin. Shape outlines are clipped like other gizmos; ghost blocks, solid fills and text aren't. Dev runs
+  load a local jar with `-PgizmolibJar=<path>` (never commit the jar). Its `gizmo_*` functions send to the player
+  running them, so the test runs them via `execute as @p`.
 - Area render entities: with Freeze Entities on, the mesh keeps copies taken at build time (players are copied as
   `RemotePlayer`s since they can't be created from their type). With it off, entities are looked up from the world
   every frame, so new ones appear and dead ones go away. Show Entities / Show Players hide them, hitboxes included;

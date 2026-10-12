@@ -24,6 +24,11 @@ loom {
     // Dev and test runs: enough memory for big area renders and shader packs
     runs.configureEach {
         vmArg "-Xmx8G"
+
+        // gizmolib isn't published anywhere, -PgizmolibJar=<path> loads a local jar as an extra mod
+        if (project.hasProperty("gizmolibJar")) {
+            vmArg "-Dfabric.addMods=${project.property("gizmolibJar")}"
+        }
     }
 }
 
@@ -86,3 +91,4 @@ fabricApi {
         eula = true
     }
 }
+
