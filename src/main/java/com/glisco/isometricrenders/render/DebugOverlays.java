@@ -2,16 +2,22 @@ package com.glisco.isometricrenders.render;
 
 import com.glisco.isometricrenders.compat.CarpetShapes;
 import com.glisco.isometricrenders.mixin.access.CameraInvoker;
+import com.glisco.isometricrenders.mixin.access.EntityHitboxDebugRendererInvoker;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.debug.EntityHitboxDebugRenderer;
 import net.minecraft.client.renderer.gizmos.DrawableGizmoPrimitives;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.LevelRenderState;
+import net.minecraft.gizmos.GizmoPrimitives;
 import net.minecraft.gizmos.Gizmos;
 import net.minecraft.gizmos.SimpleGizmoCollector;
+import net.minecraft.gizmos.TextGizmo;
 import net.minecraft.util.Util;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -19,6 +25,7 @@ import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Captures what the world renderer would draw as debug overlays (F3 hitboxes,
@@ -30,6 +37,7 @@ public final class DebugOverlays {
     private static final boolean CARPET_LOADED = FabricLoader.getInstance().isModLoaded("carpet");
 
     private static @Nullable AABB collectingArea = null;
+    private static Map<Entity, Vec3> frozenEntities = Map.of();
 
     private DebugOverlays() {}
 
@@ -41,13 +49,21 @@ public final class DebugOverlays {
     }
 
     /**
+     * @return Whether the given entity is drawn at a frozen position, while debug renderers run
+     */
+    public static boolean isFrozen(Entity entity) {
+        return frozenEntities.containsKey(entity);
+    }
+
+    /**
      * Submits all debug overlays around {@code area}, positioned relative to {@code origin}
      *
-     * @param yaw   The camera yaw text and billboards should face
-     * @param pitch The camera pitch text and billboards should face
-     * @param clip  Whether to cut off everything outside of {@code area}
+     * @param yaw            The camera yaw text and billboards should face
+     * @param pitch          The camera pitch text and billboards should face
+     * @param clip           Whether to cut off everything outside of {@code area}
+     * @param frozenEntities Entities drawn at a fixed position instead of their live one, their hitboxes follow
      */
-    public static SubmitNodeStorage collect(Vec3 origin, AABB area, float yaw, float pitch, boolean clip, float tickDelta) {
+    public static SubmitNodeStorage collect(Vec3 origin, AABB area, float yaw, float pitch, boolean clip, Map<Entity, Vec3> frozenEntities, float tickDelta) {
         final var client = Minecraft.getInstance();
         final var camera = client.gameRenderer.mainCamera();
         final float previousYaw = camera.yRot(), previousPitch = camera.xRot();
@@ -63,7 +79,7 @@ public final class DebugOverlays {
             final var levelState = new LevelRenderState();
             camera.extractRenderState(levelState.cameraRenderState, tickDelta);
 
-            submitDebugRenderers(client, levelState.cameraRenderState, origin, area, tickDelta, storage);
+            submitDebugRenderers(client, levelState.cameraRenderState, origin, area, frozenEntities, tickDelta, storage);
             if (CARPET_LOADED) CarpetShapes.submit(storage, levelState, tickDelta);
         } finally {
             ((CameraInvoker) camera).isometric$setPosition(previousPosition);
@@ -73,7 +89,7 @@ public final class DebugOverlays {
         return storage;
     }
 
-    private static void submitDebugRenderers(Minecraft client, CameraRenderState cameraState, Vec3 origin, AABB area, float tickDelta, SubmitNodeStorage storage) {
+    private static void submitDebugRenderers(Minecraft client, CameraRenderState cameraState, Vec3 origin, AABB area, Map<Entity, Vec3> frozen, float tickDelta, SubmitNodeStorage storage) {
         if (client.level == null || client.getConnection() == null) return;
 
         // Same everything-nearby frustum as particles, the area restriction happens later
@@ -82,11 +98,13 @@ public final class DebugOverlays {
 
         final var collector = new SimpleGizmoCollector();
         collectingArea = area;
+        frozenEntities = frozen;
         try (var ignored = Gizmos.withCollector(collector)) {
             client.levelExtractor.debugRenderer.emitGizmos(frustum, origin.x, origin.y, origin.z, tickDelta);
             client.levelExtractor.gameTestBlockHighlightRenderer.emitGizmos();
         } finally {
             collectingArea = null;
+            frozenEntities = Map.of();
         }
 
         // Gizmos sent by the game itself (debug commands, game tests, ...)
@@ -101,8 +119,65 @@ public final class DebugOverlays {
             instance.gizmo().emit(instance.isAlwaysOnTop() ? onTop : standard, instance.getAlphaMultiplier(now));
         }
 
+        if (client.debugEntries.isCurrentlyEnabled(DebugScreenEntries.ENTITY_HITBOXES)) {
+            emitFrozenHitboxes(client, frozen, standard, onTop, now);
+        }
+
         standard.submit(storage, cameraState, false);
         onTop.submit(storage, cameraState, true);
+    }
+
+    /**
+     * Runs vanilla's hitbox drawing for each frozen entity and moves
+     * the result from the entity's live position to its frozen one
+     */
+    private static void emitFrozenHitboxes(Minecraft client, Map<Entity, Vec3> frozen, GizmoPrimitives standard, GizmoPrimitives onTop, long now) {
+        final var hitboxes = (EntityHitboxDebugRendererInvoker) new EntityHitboxDebugRenderer(client);
+
+        frozen.forEach((entity, frozenPos) -> {
+            if (entity.isInvisible()) return;
+
+            final float partialTicks = client.getDeltaTracker().getGameTimeDeltaPartialTick(!entity.level().tickRateManager().isEntityFrozen(entity));
+            final var collector = new SimpleGizmoCollector();
+            try (var ignored = Gizmos.withCollector(collector)) {
+                hitboxes.isometric$showHitboxes(entity, partialTicks, false);
+            }
+
+            final var offset = frozenPos.subtract(entity.getPosition(partialTicks));
+            for (var instance : collector.drainGizmos()) {
+                instance.gizmo().emit(new OffsetPrimitives(instance.isAlwaysOnTop() ? onTop : standard, offset), instance.getAlphaMultiplier(now));
+            }
+        });
+    }
+
+    private record OffsetPrimitives(GizmoPrimitives delegate, Vec3 offset) implements GizmoPrimitives {
+
+        @Override
+        public void addPoint(Vec3 pos, int color, float size) {
+            this.delegate.addPoint(pos.add(this.offset), color, size);
+        }
+
+        @Override
+        public void addLine(Vec3 start, Vec3 end, int color, float width) {
+            this.delegate.addLine(start.add(this.offset), end.add(this.offset), color, width);
+        }
+
+        @Override
+        public void addTriangleFan(Vec3[] points, int color) {
+            final var moved = new Vec3[points.length];
+            for (int i = 0; i < points.length; i++) moved[i] = points[i].add(this.offset);
+            this.delegate.addTriangleFan(moved, color);
+        }
+
+        @Override
+        public void addQuad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, int color) {
+            this.delegate.addQuad(a.add(this.offset), b.add(this.offset), c.add(this.offset), d.add(this.offset), color);
+        }
+
+        @Override
+        public void addText(Vec3 pos, String text, TextGizmo.Style style) {
+            this.delegate.addText(pos.add(this.offset), text, style);
+        }
     }
 
     /**

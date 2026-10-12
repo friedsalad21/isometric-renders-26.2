@@ -17,6 +17,9 @@ public class LevelExtractorMixin {
     @Inject(method = "isEntityVisible", at = @At("HEAD"), cancellable = true)
     private void showEntitiesInRenderedArea(Entity entity, Frustum frustum, double camX, double camY, double camZ, CallbackInfoReturnable<Boolean> cir) {
         final var area = DebugOverlays.collectingArea();
-        if (area != null) cir.setReturnValue(area.intersects(entity.getBoundingBox()));
+        if (area == null) return;
+
+        // Frozen entities get their hitboxes drawn separately, at their frozen position
+        cir.setReturnValue(!DebugOverlays.isFrozen(entity) && area.intersects(entity.getBoundingBox()));
     }
 }

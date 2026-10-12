@@ -17,6 +17,7 @@
     "access.BlockEntityAccessor",
     "access.BlockStateArgumentAccessor",
     "access.CameraInvoker",
+    "access.EntityHitboxDebugRendererInvoker",
     "access.ItemRenderStateAccessor",
     "access.LayerRenderStateAccessor"
   ],

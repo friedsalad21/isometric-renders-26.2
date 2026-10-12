@@ -66,6 +66,9 @@ public class IsometricClientGameTest implements FabricClientGameTest {
                 return screen;
             });
             context.waitTicks(30);
+            // The pig moves after the mesh froze it, its hitbox has to stay on the frozen model
+            server.runCommand("tp @e[type=minecraft:pig] " + (origin.getX() + 3.5) + " " + (origin.getY() + 1) + " " + (origin.getZ() + 3.5));
+            context.waitTicks(10);
             context.runOnClient(client -> ((RenderScreen) client.gui.screen()).scheduleCapture());
             context.waitFor(client -> debugExport.get() != null, 200);
             System.out.println("[isometric-gametest] exported " + debugExport.get().getAbsolutePath());

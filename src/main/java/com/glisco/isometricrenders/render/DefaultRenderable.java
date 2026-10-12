@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.state.level.ParticlesRenderState;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -19,6 +20,8 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
+
+import java.util.Map;
 
 public abstract class DefaultRenderable<P extends DefaultPropertyBundle> implements Renderable<P> {
 
@@ -80,8 +83,8 @@ public abstract class DefaultRenderable<P extends DefaultPropertyBundle> impleme
     /**
      * Captures the world's debug overlays inside {@code area}, drawn with {@code origin} at the current pose
      */
-    protected void renderDebugOverlays(PoseStack matrices, Vec3 origin, AABB area, boolean clip, float tickDelta) {
-        this.pendingDebugOverlays = DebugOverlays.collect(origin, area, this.cameraYaw(), this.properties().slant.get(), clip, tickDelta);
+    protected void renderDebugOverlays(PoseStack matrices, Vec3 origin, AABB area, boolean clip, Map<Entity, Vec3> frozenEntities, float tickDelta) {
+        this.pendingDebugOverlays = DebugOverlays.collect(origin, area, this.cameraYaw(), this.properties().slant.get(), clip, frozenEntities, tickDelta);
         this.debugOverlayTransform.set(matrices.last().pose());
     }
 

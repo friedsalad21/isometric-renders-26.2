@@ -20,10 +20,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
+
+import java.util.HashMap;
 
 public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropertyBundle> {
 
@@ -93,7 +96,14 @@ public class AreaRenderable extends DefaultRenderable<AreaRenderable.AreaPropert
         });
 
         if (this.properties().debugOverlays.get()) {
-            this.renderDebugOverlays(matrices, Vec3.atLowerCornerOf(mesh.startPos()), mesh.dimensions(), this.properties().clipDebugOverlays.get(), tickDelta);
+            // Frozen entities are drawn where they were when the mesh was built, their hitboxes should be too
+            final var frozenEntities = new HashMap<Entity, Vec3>();
+            if (mesh.entitiesFrozen()) {
+                final var start = Vec3.atLowerCornerOf(mesh.startPos());
+                mesh.renderInfo().entities().forEach((pos, entry) -> frozenEntities.put(entry.entity(), start.add(pos)));
+            }
+
+            this.renderDebugOverlays(matrices, Vec3.atLowerCornerOf(mesh.startPos()), mesh.dimensions(), this.properties().clipDebugOverlays.get(), frozenEntities, tickDelta);
         }
 
         var diff = Vec3.atLowerCornerOf(mesh.startPos()).subtract(client.player.position());
